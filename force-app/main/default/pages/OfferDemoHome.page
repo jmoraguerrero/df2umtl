@@ -1,0 +1,4 @@
+<apex:page showHeader="false" standardStylesheets="false" sidebar="false">
+    <h1>Offer Concierge Demo</h1>
+    <p>This site hosts the Agent API broker at <code>/services/apexrest/agentdemo/</code>.</p>
+</apex:page>
