@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Instance_Url__c</fullName>
+    <label>Instance Url</label>
+    <description>The org My Domain URL passed to the Agent API as instanceConfig.endpoint.</description>
+    <inlineHelpText>The current My Domain URL of this org (https://...my.salesforce.com).</inlineHelpText>
+    <type>Text</type>
+    <length>255</length>
+    <required>false</required>
+    <unique>false</unique>
+</CustomField>

@@ -3,6 +3,18 @@
     <label>Offer Demo Access</label>
     <description>Grants access to the Offer object, its fields, and tab for the WhatsApp Agentforce offers demo.</description>
     <hasActivationRequired>false</hasActivationRequired>
+    <classAccesses>
+        <apexClass>GetOffersForContact</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentApiService</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>AgentDemoResource</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
     <objectPermissions>
         <object>Offer__c</object>
         <allowRead>true</allowRead>
