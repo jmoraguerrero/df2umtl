@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Description__c</fullName>
+    <label>Description</label>
+    <description>Customer-facing description of the offer, used by the agent to explain the offer in conversation.</description>
+    <inlineHelpText>Write a short, clear description the agent can read out to the customer.</inlineHelpText>
+    <type>LongTextArea</type>
+    <length>1000</length>
+    <visibleLines>3</visibleLines>
+</CustomField>

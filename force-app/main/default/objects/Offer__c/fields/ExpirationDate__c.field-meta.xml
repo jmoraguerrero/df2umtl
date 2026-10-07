@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>ExpirationDate__c</fullName>
+    <label>Expiration Date</label>
+    <description>Date after which the offer is no longer valid; the agent can mention urgency.</description>
+    <inlineHelpText>Enter the last day this offer is valid.</inlineHelpText>
+    <type>Date</type>
+</CustomField>

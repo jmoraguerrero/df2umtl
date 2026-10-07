@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Contact__c</fullName>
+    <label>Contact</label>
+    <description>The contact this offer is targeted to; used by the agent to find offers for the connected user.</description>
+    <inlineHelpText>Select the contact who is eligible for this offer.</inlineHelpText>
+    <type>Lookup</type>
+    <referenceTo>Contact</referenceTo>
+    <relationshipLabel>Offers</relationshipLabel>
+    <relationshipName>Offers</relationshipName>
+    <required>false</required>
+    <deleteConstraint>SetNull</deleteConstraint>
+</CustomField>
