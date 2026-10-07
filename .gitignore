@@ -1,0 +1,24 @@
+# Salesforce DX
+.sfdx/
+.sf/
+.localdevserver/
+deploy-options.json
+**/unpackaged/
+
+# Logs
+*.log
+
+# Node
+node_modules/
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+
+# Env / secrets
+.env
+*.key
+secrets.json
