@@ -1,0 +1,23 @@
+{
+    "records": [
+        {
+            "attributes": {
+                "type": "User",
+                "referenceId": "OfferConciergeAgentUser"
+            },
+            "ProfileId": "00eau000004ZeCaAAK",
+            "Username": "offerconcierge.agent@df2umtl.velocityfun.demo",
+            "Alias": "ofrcncrg",
+            "CommunityNickname": "OfferConciergeAgent",
+            "Email": "noreply@example.com",
+            "FirstName": "Offer",
+            "LastName": "Concierge",
+            "IsActive": true,
+            "ForecastEnabled": false,
+            "EmailEncodingKey": "UTF-8",
+            "LanguageLocaleKey": "en_US",
+            "LocaleSidKey": "en_US",
+            "TimeZoneSidKey": "America/Toronto"
+        }
+    ]
+}
