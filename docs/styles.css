@@ -104,6 +104,26 @@ body {
   opacity: 0.95;
 }
 
+.voice-toggle {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  line-height: 1;
+  transition: background 0.15s;
+}
+
+.voice-toggle:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.voice-toggle.active {
+  background: rgba(255, 255, 255, 0.25);
+}
+
 /* Body */
 .chat-body {
   flex: 1;
@@ -281,6 +301,55 @@ body {
 .send-btn:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+/* Morphing action button: mic by default, send when there's text */
+.send-btn .icon {
+  position: absolute;
+}
+
+.send-btn .icon-send {
+  display: none;
+}
+
+.send-btn .icon-mic {
+  display: block;
+}
+
+.composer.has-text .send-btn .icon-send {
+  display: block;
+}
+
+.composer.has-text .send-btn .icon-mic {
+  display: none;
+}
+
+/* Recording state */
+.send-btn.recording {
+  background: #e3493a;
+  animation: pulse-rec 1.1s infinite;
+}
+
+@keyframes pulse-rec {
+  0% {
+    box-shadow: 0 0 0 0 rgba(227, 73, 58, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgba(227, 73, 58, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(227, 73, 58, 0);
+  }
+}
+
+.listening-pill {
+  align-self: center;
+  background: #e3493a;
+  color: #fff;
+  font-size: 12.5px;
+  padding: 5px 14px;
+  border-radius: 14px;
+  margin: 4px 0;
 }
 
 .error-banner {

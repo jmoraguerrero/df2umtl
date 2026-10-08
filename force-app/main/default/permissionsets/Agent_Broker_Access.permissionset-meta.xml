@@ -15,4 +15,13 @@
         <enabled>true</enabled>
         <externalCredentialPrincipal>DF2U_EC-AgentApiPrincipal</externalCredentialPrincipal>
     </externalCredentialPrincipalAccesses>
+    <objectPermissions>
+        <object>UserExternalCredential</object>
+        <allowRead>true</allowRead>
+        <allowCreate>false</allowCreate>
+        <allowEdit>false</allowEdit>
+        <allowDelete>false</allowDelete>
+        <viewAllRecords>false</viewAllRecords>
+        <modifyAllRecords>false</modifyAllRecords>
+    </objectPermissions>
 </PermissionSet>

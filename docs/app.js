@@ -11,7 +11,9 @@
 
   var chatBody = document.getElementById("chatBody");
   var input = document.getElementById("messageInput");
-  var sendBtn = document.getElementById("sendBtn");
+  var actionBtn = document.getElementById("actionBtn");
+  var composer = document.querySelector(".composer");
+  var voiceToggle = document.getElementById("voiceToggle");
   var agentNameEl = document.getElementById("agentName");
   var agentStatusEl = document.getElementById("agentStatus");
 
@@ -45,6 +47,7 @@
     el.appendChild(meta);
     chatBody.appendChild(el);
     scrollDown();
+    if (who === "in") speak(text);
     return el;
   }
 
@@ -72,7 +75,7 @@
 
   function setBusy(state) {
     busy = state;
-    sendBtn.disabled = state;
+    actionBtn.disabled = state;
     input.disabled = state;
   }
 
@@ -144,13 +147,168 @@
     var text = input.value.trim();
     if (!text || busy) return;
     input.value = "";
+    refreshActionButton();
     sendToAgent(text, false);
   }
 
-  sendBtn.addEventListener("click", handleSend);
+  // --- Morphing action button (mic when empty, send when text) ---
+
+  function refreshActionButton() {
+    if (input.value.trim()) {
+      composer.classList.add("has-text");
+      actionBtn.setAttribute("aria-label", "Send message");
+    } else {
+      composer.classList.remove("has-text");
+      actionBtn.setAttribute(
+        "aria-label",
+        recognition ? "Record voice message" : "Send message"
+      );
+    }
+  }
+
+  // --- Speech-to-text (Web Speech API) ---
+
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var recognition = null;
+  var listening = false;
+
+  function showListeningPill(on) {
+    var existing = document.getElementById("listeningPill");
+    if (on && !existing) {
+      var pill = document.createElement("div");
+      pill.className = "listening-pill";
+      pill.id = "listeningPill";
+      pill.textContent = "Listening…";
+      chatBody.appendChild(pill);
+      scrollDown();
+    } else if (!on && existing) {
+      existing.remove();
+    }
+  }
+
+  function setupRecognition() {
+    if (!SR) return;
+    recognition = new SR();
+    recognition.lang = "en-US";
+    recognition.interimResults = true;
+    recognition.continuous = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = function (e) {
+      var transcript = "";
+      for (var i = 0; i < e.results.length; i++) {
+        transcript += e.results[i][0].transcript;
+      }
+      input.value = transcript;
+      refreshActionButton();
+      // When the engine marks a final result, send it automatically.
+      if (e.results[e.results.length - 1].isFinal) {
+        stopRecognition();
+        var text = input.value.trim();
+        if (text) {
+          input.value = "";
+          refreshActionButton();
+          sendToAgent(text, false);
+        }
+      }
+    };
+
+    recognition.onend = function () {
+      listening = false;
+      actionBtn.classList.remove("recording");
+      showListeningPill(false);
+      refreshActionButton();
+    };
+
+    recognition.onerror = function (ev) {
+      listening = false;
+      actionBtn.classList.remove("recording");
+      showListeningPill(false);
+      if (ev.error !== "no-speech" && ev.error !== "aborted") {
+        showError("Mic error: " + ev.error);
+      }
+    };
+  }
+
+  function startRecognition() {
+    if (!recognition || busy) return;
+    try {
+      // Cancel any ongoing voice output so the mic doesn't hear the agent.
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      input.value = "";
+      refreshActionButton();
+      recognition.start();
+      listening = true;
+      actionBtn.classList.add("recording");
+      showListeningPill(true);
+    } catch (e) {
+      /* start() can throw if already started */
+    }
+  }
+
+  function stopRecognition() {
+    if (recognition && listening) {
+      try {
+        recognition.stop();
+      } catch (e) {
+        /* noop */
+      }
+    }
+  }
+
+  // --- Text-to-speech (agent replies) ---
+
+  var voiceOn = localStorage.getItem("offerDemoVoiceOn") === "1";
+
+  function reflectVoiceToggle() {
+    if (!window.speechSynthesis) {
+      voiceToggle.style.display = "none";
+      return;
+    }
+    voiceToggle.classList.toggle("active", voiceOn);
+    voiceToggle.innerHTML = voiceOn ? "&#128266;" : "&#128263;";
+    voiceToggle.title = voiceOn ? "Voice replies on" : "Voice replies off";
+  }
+
+  function speak(text) {
+    if (!voiceOn || !window.speechSynthesis || !text) return;
+    try {
+      var u = new SpeechSynthesisUtterance(text);
+      u.lang = "en-US";
+      u.rate = 1.02;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(u);
+    } catch (e) {
+      /* noop */
+    }
+  }
+
+  voiceToggle.addEventListener("click", function () {
+    voiceOn = !voiceOn;
+    localStorage.setItem("offerDemoVoiceOn", voiceOn ? "1" : "0");
+    reflectVoiceToggle();
+    if (!voiceOn && window.speechSynthesis) window.speechSynthesis.cancel();
+  });
+
+  // --- Wiring ---
+
+  actionBtn.addEventListener("click", function () {
+    if (input.value.trim()) {
+      handleSend();
+    } else if (recognition) {
+      if (listening) stopRecognition();
+      else startRecognition();
+    }
+  });
+
+  input.addEventListener("input", refreshActionButton);
   input.addEventListener("keydown", function (e) {
     if (e.key === "Enter") handleSend();
   });
+
+  setupRecognition();
+  reflectVoiceToggle();
+  refreshActionButton();
 
   if (!BASE) {
     showError("Broker URL is not configured (see config.js).");
