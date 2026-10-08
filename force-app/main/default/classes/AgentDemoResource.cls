@@ -99,17 +99,76 @@ global with sharing class AgentDemoResource {
      * Runs the Contact lookup without sharing so the Site guest user can match a
      * customer by name (guest users are blocked from "View All" and are heavily
      * sharing-restricted). Object-level read is still enforced via the permission set.
+     *
+     * Accepts natural phrasing like "My name is Alex Morgan" by stripping common
+     * lead-in phrases and punctuation, then matching the whole cleaned name and,
+     * failing that, every significant word.
      */
     private without sharing class ContactFinder {
-        List<Contact> byName(String name) {
-            String pattern = '%' + name + '%';
-            return [
+        List<Contact> byName(String rawName) {
+            String cleaned = cleanName(rawName);
+            if (String.isBlank(cleaned)) {
+                return new List<Contact>();
+            }
+
+            // 1) Try the cleaned name as a whole.
+            String full = '%' + cleaned + '%';
+            List<Contact> hits = [
                 SELECT Id, Name
                 FROM Contact
-                WHERE Name LIKE :pattern
+                WHERE Name LIKE :full
                 ORDER BY CreatedDate ASC
                 LIMIT 1
             ];
+            if (!hits.isEmpty()) {
+                return hits;
+            }
+
+            // 2) Fall back to matching every significant word (handles extra words
+            //    or different ordering).
+            List<String> clauses = new List<String>();
+            for (String word : cleaned.split(' ')) {
+                if (word.length() >= 2) {
+                    clauses.add('Name LIKE \'%' + String.escapeSingleQuotes(word) + '%\'');
+                }
+            }
+            if (clauses.isEmpty()) {
+                return new List<Contact>();
+            }
+            String soql = 'SELECT Id, Name FROM Contact WHERE '
+                + String.join(clauses, ' AND ')
+                + ' ORDER BY CreatedDate ASC LIMIT 1';
+            return Database.query(soql);
+        }
+
+        String cleanName(String raw) {
+            if (String.isBlank(raw)) {
+                return '';
+            }
+            // Lowercase and replace any punctuation with spaces (LIKE is
+            // case-insensitive, so lowercase still matches mixed-case names).
+            String s = raw.toLowerCase().replaceAll('[^a-z0-9\\s]', ' ');
+            s = s.trim().replaceAll('\\s+', ' ');
+
+            List<String> leadIns = new List<String>{
+                'my name is', 'the name is', 'name is', 'i am', 'i m', 'im',
+                'this is', 'it is', 'it s', 'its', 'call me', 'hello', 'hey', 'hi'
+            };
+            Boolean changed = true;
+            while (changed) {
+                changed = false;
+                for (String lead : leadIns) {
+                    if (s == lead) {
+                        return '';
+                    }
+                    if (s.startsWith(lead + ' ')) {
+                        s = s.substring(lead.length() + 1).trim();
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+            return s.replaceAll('\\s+', ' ').trim();
         }
     }
 

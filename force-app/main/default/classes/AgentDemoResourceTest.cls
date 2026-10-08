@@ -77,6 +77,20 @@ private class AgentDemoResourceTest {
     }
 
     @IsTest
+    static void resolveEndpointHandlesSentenceInput() {
+        Contact c = new Contact(FirstName = 'Alex', LastName = 'Morgan');
+        insert c;
+        buildRequest('/services/apexrest/agentdemo/resolve', '{"name":"My name is Alex Morgan"}');
+        Test.startTest();
+        AgentDemoResource.handlePost();
+        Test.stopTest();
+        System.assertEquals(200, RestContext.response.statusCode);
+        String body = RestContext.response.responseBody.toString();
+        System.assert(body.contains('"found":true'), body);
+        System.assert(body.contains(c.Id), body);
+    }
+
+    @IsTest
     static void resolveEndpointReturnsNotFound() {
         buildRequest('/services/apexrest/agentdemo/resolve', '{"name":"No Such Person Xyz"}');
         Test.startTest();
