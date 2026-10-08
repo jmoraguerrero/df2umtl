@@ -30,10 +30,14 @@ global with sharing class AgentDemoResource {
 
     global class ResolveResponse {
         global Boolean found;
+        global Boolean ambiguous;
+        global Integer matchCount;
         global String contactId;
         global String matchedName;
-        global ResolveResponse(Boolean found, String contactId, String matchedName) {
+        global ResolveResponse(Boolean found, Boolean ambiguous, Integer matchCount, String contactId, String matchedName) {
             this.found = found;
+            this.ambiguous = ambiguous;
+            this.matchCount = matchCount;
             this.contactId = contactId;
             this.matchedName = matchedName;
         }
@@ -86,13 +90,17 @@ global with sharing class AgentDemoResource {
 
     private static ResolveResponse resolveContact(String name) {
         if (String.isBlank(name)) {
-            return new ResolveResponse(false, null, null);
+            return new ResolveResponse(false, false, 0, null, null);
         }
         List<Contact> contacts = new ContactFinder().byName(name.trim());
         if (contacts.isEmpty()) {
-            return new ResolveResponse(false, null, null);
+            return new ResolveResponse(false, false, 0, null, null);
         }
-        return new ResolveResponse(true, contacts[0].Id, contacts[0].Name);
+        if (contacts.size() > 1) {
+            // Multiple people match - ask the customer for more detail.
+            return new ResolveResponse(false, true, contacts.size(), null, null);
+        }
+        return new ResolveResponse(true, false, 1, contacts[0].Id, contacts[0].Name);
     }
 
     /**
@@ -118,7 +126,7 @@ global with sharing class AgentDemoResource {
                 FROM Contact
                 WHERE Name LIKE :full
                 ORDER BY CreatedDate ASC
-                LIMIT 1
+                LIMIT 5
             ];
             if (!hits.isEmpty()) {
                 return hits;
@@ -137,7 +145,7 @@ global with sharing class AgentDemoResource {
             }
             String soql = 'SELECT Id, Name FROM Contact WHERE '
                 + String.join(clauses, ' AND ')
-                + ' ORDER BY CreatedDate ASC LIMIT 1';
+                + ' ORDER BY CreatedDate ASC LIMIT 5';
             return Database.query(soql);
         }
 

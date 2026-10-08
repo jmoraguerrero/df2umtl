@@ -130,6 +130,11 @@
         contactId = data.contactId;
         awaitingName = false;
         await startSession();
+      } else if (data && data.ambiguous) {
+        addMessage(
+          "I found more than one account matching that. Could you share your full name (first and last) so I can find the right one?",
+          "in"
+        );
       } else {
         addMessage(
           'I couldn\u2019t find an account under "' +

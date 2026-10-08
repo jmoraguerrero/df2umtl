@@ -91,6 +91,22 @@ private class AgentDemoResourceTest {
     }
 
     @IsTest
+    static void resolveEndpointAmbiguousAsksForMore() {
+        insert new List<Contact>{
+            new Contact(FirstName = 'Alex', LastName = 'Morgan'),
+            new Contact(FirstName = 'Jamie', LastName = 'Morgan')
+        };
+        buildRequest('/services/apexrest/agentdemo/resolve', '{"name":"Morgan"}');
+        Test.startTest();
+        AgentDemoResource.handlePost();
+        Test.stopTest();
+        System.assertEquals(200, RestContext.response.statusCode);
+        String body = RestContext.response.responseBody.toString();
+        System.assert(body.contains('"ambiguous":true'), body);
+        System.assert(body.contains('"found":false'), body);
+    }
+
+    @IsTest
     static void resolveEndpointReturnsNotFound() {
         buildRequest('/services/apexrest/agentdemo/resolve', '{"name":"No Such Person Xyz"}');
         Test.startTest();
