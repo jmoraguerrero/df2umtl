@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Offer Concierge</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="phone">
+      <!-- Chat header -->
+      <header class="chat-header">
+        <button class="back-btn" aria-label="Back">&#8249;</button>
+        <div class="avatar" id="agentAvatar">OC</div>
+        <div class="header-info">
+          <div class="header-name" id="agentName">Offer Concierge</div>
+          <div class="header-status" id="agentStatus">online</div>
+        </div>
+        <div class="header-icons">
+          <span aria-hidden="true">&#128247;</span>
+          <span aria-hidden="true">&#9742;</span>
+          <span aria-hidden="true">&#8942;</span>
+        </div>
+      </header>
+
+      <!-- Messages -->
+      <main class="chat-body" id="chatBody">
+        <div class="date-pill">today</div>
+        <div class="encryption-note">
+          Messages are routed to Salesforce Agentforce. This is a demo.
+        </div>
+      </main>
+
+      <!-- Composer -->
+      <footer class="composer">
+        <div class="composer-input">
+          <span class="emoji" aria-hidden="true">&#128512;</span>
+          <input
+            type="text"
+            id="messageInput"
+            placeholder="Type a message"
+            autocomplete="off"
+          />
+          <span class="clip" aria-hidden="true">&#128206;</span>
+        </div>
+        <button class="send-btn" id="sendBtn" aria-label="Send">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+          </svg>
+        </button>
+      </footer>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
