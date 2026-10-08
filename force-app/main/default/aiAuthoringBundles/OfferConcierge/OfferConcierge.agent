@@ -13,6 +13,7 @@ config:
 
 variables:
     Contact_Id: mutable string = ""
+        visibility: External
         description: "Salesforce Contact Id of the connected customer, supplied by the web broker through the Agent API. Used to look up the customer's offers."
     offers_summary: mutable string = ""
         description: "The latest formatted offers text returned by the get_offers action."

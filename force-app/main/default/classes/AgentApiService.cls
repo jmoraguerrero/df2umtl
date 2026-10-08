@@ -116,7 +116,7 @@ public with sharing class AgentApiService {
         HttpResponse res = new Http().send(req);
         if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {
             throw new AgentApiException(
-                'Agent API error ' + res.getStatusCode() + ': ' + res.getBody()
+                'Agent API error ' + res.getStatusCode() + ' (' + res.getStatus() + '): ' + res.getBody()
             );
         }
         return res;
