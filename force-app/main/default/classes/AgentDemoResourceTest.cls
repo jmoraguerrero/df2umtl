@@ -63,6 +63,40 @@ private class AgentDemoResourceTest {
     }
 
     @IsTest
+    static void resolveEndpointFindsContactByName() {
+        Contact c = new Contact(FirstName = 'Resolve', LastName = 'Tester');
+        insert c;
+        buildRequest('/services/apexrest/agentdemo/resolve', '{"name":"Resolve Tester"}');
+        Test.startTest();
+        AgentDemoResource.handlePost();
+        Test.stopTest();
+        System.assertEquals(200, RestContext.response.statusCode);
+        String body = RestContext.response.responseBody.toString();
+        System.assert(body.contains('"found":true'), body);
+        System.assert(body.contains(c.Id), body);
+    }
+
+    @IsTest
+    static void resolveEndpointReturnsNotFound() {
+        buildRequest('/services/apexrest/agentdemo/resolve', '{"name":"No Such Person Xyz"}');
+        Test.startTest();
+        AgentDemoResource.handlePost();
+        Test.stopTest();
+        System.assertEquals(200, RestContext.response.statusCode);
+        System.assert(RestContext.response.responseBody.toString().contains('"found":false'));
+    }
+
+    @IsTest
+    static void resolveEndpointBlankNameNotFound() {
+        buildRequest('/services/apexrest/agentdemo/resolve', '{"name":""}');
+        Test.startTest();
+        AgentDemoResource.handlePost();
+        Test.stopTest();
+        System.assertEquals(200, RestContext.response.statusCode);
+        System.assert(RestContext.response.responseBody.toString().contains('"found":false'));
+    }
+
+    @IsTest
     static void unknownActionReturns404() {
         setConfig();
         buildRequest('/services/apexrest/agentdemo/bogus', '{}');

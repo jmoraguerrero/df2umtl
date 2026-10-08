@@ -13,12 +13,14 @@ config:
 
 variables:
     Contact_Id: mutable string = ""
-        visibility: External
+        visibility: "External"
         description: "Salesforce Contact Id of the connected customer, supplied by the web broker through the Agent API. Used to look up the customer's offers."
     offers_summary: mutable string = ""
         description: "The latest formatted offers text returned by the get_offers action."
     offer_count: mutable number = 0
         description: "How many offers were found for the connected customer."
+    customer_known: mutable number = 0
+        description: "1 when the connected customer is already identified by a contact id, otherwise 0."
 
 language:
     default_locale: "en_US"
@@ -31,13 +33,15 @@ start_agent agent_router:
 
     reasoning:
         instructions: ->
-            | Route the customer's message to the right subagent. Almost every request should go to
-              offer discovery, since this agent exists to help customers explore their personalized offers.
+            | Route the customer's message to the right subagent.
+              Route greetings and anything about offers, plans, prices, discounts, eligibility, or a
+              request to find an account by name to offer discovery. Offer discovery handles both
+              customers we already know and customers we still need to identify.
               Use off topic only for clearly unrelated requests, and ambiguous question only when the
               message is too vague to act on.
         actions:
             go_to_offer_discovery: @utils.transition to @subagent.offer_discovery
-                description: "For greetings and anything about offers, plans, prices, discounts, or what the customer is eligible for."
+                description: "For greetings and anything about offers, plans, prices, discounts, eligibility, or identifying the customer by name."
             go_to_off_topic: @utils.transition to @subagent.off_topic
                 description: "For requests clearly unrelated to offers or plans."
             go_to_ambiguous_question: @utils.transition to @subagent.ambiguous_question
@@ -45,7 +49,7 @@ start_agent agent_router:
 
 subagent offer_discovery:
     label: "Offer Discovery"
-    description: "Find and present the personalized offers available to the connected customer and answer follow-up questions about them (price, discount, what's included, expiry)."
+    description: "Identify the customer when needed, then find and present their personalized offers and answer follow-up questions about them (price, discount, what's included, expiry)."
 
     reasoning:
         instructions: ->
@@ -53,14 +57,29 @@ subagent offer_discovery:
                 with contactId = @variables.Contact_Id
                 set @variables.offers_summary = @outputs.offersSummary
                 set @variables.offer_count = @outputs.offerCount
+                set @variables.customer_known = @outputs.identifiedFlag
 
             | You are chatting with the customer on a messaging app. Keep replies short and friendly,
               like WhatsApp messages, and use a warm, helpful tone.
 
-            if @variables.offer_count == 0:
+            if @variables.customer_known == 0:
+                | We do NOT know who this customer is yet (no account on file).
+                  - If the customer has NOT yet told you their name, warmly greet them and ask for their
+                    full name so you can look up their personalized offers. Ask ONLY for the name and do
+                    NOT call any action yet.
+                  - As soon as the customer gives you their name, immediately call the Get Offers By Name
+                    action with the exact name they gave. Do NOT reply with filler like "let me check" or
+                    "one moment" - call the action and present the result in the same reply. If a matching
+                    customer was found, greet them by name and present their offers using the exact offer
+                    names, prices, and discounts from the returned Offers Summary - do NOT paraphrase
+                    numbers, invent offers, or change any values. If no match was found, politely say you
+                    couldn't find an account under that name and ask them to double-check the exact name.
+
+            if @variables.customer_known == 1 and @variables.offer_count == 0:
                 | There are no offers available for this customer right now. Let them know politely and
                   offer to help with any questions about our plans.
-            else:
+
+            if @variables.customer_known == 1 and @variables.offer_count != 0:
                 | Present the offers below to the customer in an inviting way. Use the exact offer names,
                   prices, and discounts from the text - do NOT paraphrase numbers, invent offers, or change
                   any values. After presenting them, invite the customer to ask about any offer.
@@ -68,9 +87,9 @@ subagent offer_discovery:
                   Offers:
                   {!@variables.offers_summary}
 
-            | When the customer asks about a specific offer, answer using only the information in the offers
-              above. Do not re-run the lookup unless the customer asks for an update or a different category.
-              Do NOT use the show_command tool. Always compose your response as direct text.
+            | When the customer asks about a specific offer, answer using only the information you already
+              retrieved above. Do not re-run a lookup unless the customer asks for an update or a different
+              category. Do NOT use the show_command tool. Always compose your response as direct text.
 
     actions:
         get_offers:
@@ -81,11 +100,46 @@ subagent offer_discovery:
                 contactId: string
                     description: "Salesforce Contact Id of the connected customer."
                     label: "Contact Id"
-                    is_required: True
+                    is_required: False
             outputs:
                 offersSummary: string
                     description: "Readable list of offers to present to the customer."
                     label: "Offers Summary"
+                    is_displayable: True
+                    filter_from_agent: False
+                offerCount: integer
+                    description: "Number of offers found for the customer."
+                    label: "Offer Count"
+                    is_displayable: False
+                    filter_from_agent: True
+                identifiedFlag: integer
+                    description: "1 when the customer is identified by contact id, otherwise 0."
+                    label: "Identified Flag"
+                    is_displayable: False
+                    filter_from_agent: True
+        get_offers_by_name:
+            description: "Finds a contact by name and returns their active, non-expired offers."
+            label: "Get Offers By Name"
+            target: "apex://GetOffersByName"
+            inputs:
+                customerName: string
+                    description: "The customer's full name exactly as they provided it."
+                    label: "Customer Name"
+                    is_required: False
+            outputs:
+                offersSummary: string
+                    description: "Readable list of offers to present to the customer."
+                    label: "Offers Summary"
+                    is_displayable: True
+                    filter_from_agent: False
+                customerFound: boolean
+                    description: "True when a matching contact was found."
+                    label: "Customer Found"
+                    is_displayable: False
+                    filter_from_agent: False
+                matchedName: string
+                    description: "The full name of the matched contact."
+                    label: "Matched Name"
                     is_displayable: True
                     filter_from_agent: False
                 offerCount: integer

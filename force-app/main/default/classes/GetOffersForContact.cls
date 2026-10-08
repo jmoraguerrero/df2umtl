@@ -35,6 +35,8 @@ public with sharing class GetOffersForContact {
     public class Response {
         @InvocableVariable(label='Offer Count' description='Number of offers found for the contact.')
         public Integer offerCount;
+        @InvocableVariable(label='Identified Flag' description='1 when a valid contact id was supplied (customer is known), otherwise 0.')
+        public Integer identifiedFlag;
         @InvocableVariable(label='Offers Summary' description='A human-readable summary of the offers the agent can read to the customer.')
         public String offersSummary;
         @InvocableVariable(label='Offers' description='Structured list of the offers found.')
@@ -57,11 +59,14 @@ public with sharing class GetOffersForContact {
         Response res = new Response();
         res.offers = new List<OfferInfo>();
         res.offerCount = 0;
+        res.identifiedFlag = 0;
 
         if (String.isBlank(contactId) || !(contactId instanceof Id)) {
             res.offersSummary = 'No customer was identified, so no offers could be retrieved.';
             return res;
         }
+
+        res.identifiedFlag = 1;
 
         Id cId = (Id) contactId;
         List<Offer__c> records = [

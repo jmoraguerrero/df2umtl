@@ -28,6 +28,17 @@ global with sharing class AgentDemoResource {
         global MessageResponse(String reply) { this.reply = reply; }
     }
 
+    global class ResolveResponse {
+        global Boolean found;
+        global String contactId;
+        global String matchedName;
+        global ResolveResponse(Boolean found, String contactId, String matchedName) {
+            this.found = found;
+            this.contactId = contactId;
+            this.matchedName = matchedName;
+        }
+    }
+
     @HttpPost
     global static void handlePost() {
         RestRequest req = RestContext.request;
@@ -58,6 +69,11 @@ global with sharing class AgentDemoResource {
                 res.statusCode = 200;
                 res.responseBody = Blob.valueOf(JSON.serialize(new MessageResponse(reply)));
 
+            } else if (action == 'resolve') {
+                String name = str(input.get('name'));
+                res.statusCode = 200;
+                res.responseBody = Blob.valueOf(JSON.serialize(resolveContact(name)));
+
             } else {
                 res.statusCode = 404;
                 res.responseBody = Blob.valueOf(JSON.serialize(new ErrorResponse('Unknown action: ' + action)));
@@ -65,6 +81,35 @@ global with sharing class AgentDemoResource {
         } catch (Exception e) {
             res.statusCode = 500;
             res.responseBody = Blob.valueOf(JSON.serialize(new ErrorResponse(e.getMessage())));
+        }
+    }
+
+    private static ResolveResponse resolveContact(String name) {
+        if (String.isBlank(name)) {
+            return new ResolveResponse(false, null, null);
+        }
+        List<Contact> contacts = new ContactFinder().byName(name.trim());
+        if (contacts.isEmpty()) {
+            return new ResolveResponse(false, null, null);
+        }
+        return new ResolveResponse(true, contacts[0].Id, contacts[0].Name);
+    }
+
+    /**
+     * Runs the Contact lookup without sharing so the Site guest user can match a
+     * customer by name (guest users are blocked from "View All" and are heavily
+     * sharing-restricted). Object-level read is still enforced via the permission set.
+     */
+    private without sharing class ContactFinder {
+        List<Contact> byName(String name) {
+            String pattern = '%' + name + '%';
+            return [
+                SELECT Id, Name
+                FROM Contact
+                WHERE Name LIKE :pattern
+                ORDER BY CreatedDate ASC
+                LIMIT 1
+            ];
         }
     }
 

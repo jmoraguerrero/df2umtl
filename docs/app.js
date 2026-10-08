@@ -4,10 +4,10 @@
   var cfg = window.OFFER_DEMO_CONFIG || {};
   var BASE = (cfg.BROKER_BASE_URL || "").replace(/\/+$/, "");
 
-  // Resolve the contact id from the URL (?contactId=... or ?c=...), else default.
+  // Resolve the contact id from the URL (?contactId=... or ?c=...). When none is
+  // supplied we start an anonymous session and let the agent ask for the name.
   var params = new URLSearchParams(window.location.search);
-  var contactId =
-    params.get("contactId") || params.get("c") || cfg.DEFAULT_CONTACT_ID || "";
+  var contactId = params.get("contactId") || params.get("c") || "";
 
   var chatBody = document.getElementById("chatBody");
   var input = document.getElementById("messageInput");
@@ -23,6 +23,9 @@
   var sessionId = null;
   var sequenceId = 1;
   var busy = false;
+  // When no contactId is supplied we first ask the customer for their name and
+  // resolve it to a contact before starting the agent session.
+  var awaitingName = false;
 
   function scrollDown() {
     chatBody.scrollTop = chatBody.scrollHeight;
@@ -105,13 +108,59 @@
       var data = await postJson("/session", { contactId: contactId });
       sessionId = data.sessionId;
       hideTyping();
-      // Kick off the conversation so the agent greets and lists offers.
+      // Kick off the conversation so the agent greets and lists the offers.
       await sendToAgent("Hi! What offers do you have for me?", true);
     } catch (e) {
       hideTyping();
       showError("Couldn't start the chat: " + e.message);
     } finally {
       setBusy(false);
+      input.focus();
+    }
+  }
+
+  // Resolve a typed name to a contact, then start the agent session for them.
+  async function resolveName(name) {
+    setBusy(true);
+    showTyping();
+    try {
+      var data = await postJson("/resolve", { name: name });
+      hideTyping();
+      if (data && data.found) {
+        contactId = data.contactId;
+        awaitingName = false;
+        await startSession();
+      } else {
+        addMessage(
+          'I couldn\u2019t find an account under "' +
+            name +
+            '". Please double-check and type your full name exactly as it appears on your account.',
+          "in"
+        );
+      }
+    } catch (e) {
+      hideTyping();
+      showError("Lookup failed: " + e.message);
+    } finally {
+      setBusy(false);
+      input.focus();
+    }
+  }
+
+  function init() {
+    if (!BASE) {
+      showError("Broker URL is not configured (see config.js).");
+      return;
+    }
+    if (contactId) {
+      startSession();
+    } else {
+      // No contact supplied: ask for the name first (client-side), then resolve.
+      awaitingName = true;
+      addMessage(
+        "Hi! I\u2019m your Offer Concierge. What\u2019s your name so I can find your personalized offers?",
+        "in"
+      );
       input.focus();
     }
   }
@@ -148,7 +197,12 @@
     if (!text || busy) return;
     input.value = "";
     refreshActionButton();
-    sendToAgent(text, false);
+    if (awaitingName) {
+      addMessage(text, "out");
+      resolveName(text);
+    } else {
+      sendToAgent(text, false);
+    }
   }
 
   // --- Morphing action button (mic when empty, send when text) ---
@@ -208,7 +262,12 @@
         if (text) {
           input.value = "";
           refreshActionButton();
-          sendToAgent(text, false);
+          if (awaitingName) {
+            addMessage(text, "out");
+            resolveName(text);
+          } else {
+            sendToAgent(text, false);
+          }
         }
       }
     };
@@ -309,10 +368,5 @@
   setupRecognition();
   reflectVoiceToggle();
   refreshActionButton();
-
-  if (!BASE) {
-    showError("Broker URL is not configured (see config.js).");
-  } else {
-    startSession();
-  }
+  init();
 })();
