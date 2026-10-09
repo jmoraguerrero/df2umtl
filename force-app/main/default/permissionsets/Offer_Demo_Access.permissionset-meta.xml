@@ -72,6 +72,16 @@
         <readable>true</readable>
         <editable>true</editable>
     </fieldPermissions>
+    <fieldPermissions>
+        <field>Offer__c.RelevanceScore__c</field>
+        <readable>true</readable>
+        <editable>true</editable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Offer__c.Reason__c</field>
+        <readable>true</readable>
+        <editable>true</editable>
+    </fieldPermissions>
     <tabSettings>
         <tab>Offer__c</tab>
         <visibility>Visible</visibility>

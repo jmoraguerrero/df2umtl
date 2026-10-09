@@ -16,7 +16,11 @@ variables:
         visibility: "External"
         description: "Salesforce Contact Id of the connected customer, supplied by the web broker through the Agent API. Used to look up the customer's offers."
     offers_summary: mutable string = ""
-        description: "The latest formatted offers text returned by the get_offers action."
+        description: "The latest formatted offers text (all offers) returned by the get_offers action."
+    top_offer_summary: mutable string = ""
+        description: "The single most relevant offer, with its reason and expiry, to present first."
+    more_offers_summary: mutable string = ""
+        description: "The remaining offers as bullet points, shown only when the customer asks for more."
     offer_count: mutable number = 0
         description: "How many offers were found for the connected customer."
     customer_known: mutable number = 0
@@ -41,7 +45,9 @@ start_agent agent_router:
               message is too vague to act on.
         actions:
             go_to_offer_discovery: @utils.transition to @subagent.offer_discovery
-                description: "For greetings and anything about offers, plans, prices, discounts, eligibility, or identifying the customer by name."
+                description: "For greetings and the first ask about offers, plans, prices, discounts, eligibility, or identifying the customer by name. Presents the single best offer."
+            go_to_more_offers: @utils.transition to @subagent.more_offers
+                description: "When the customer asks to see more, other, or additional offers / options (e.g. 'show me more', 'what else do you have', 'other offers')."
             go_to_off_topic: @utils.transition to @subagent.off_topic
                 description: "For requests clearly unrelated to offers or plans."
             go_to_ambiguous_question: @utils.transition to @subagent.ambiguous_question
@@ -56,11 +62,14 @@ subagent offer_discovery:
             run @actions.get_offers
                 with contactId = @variables.Contact_Id
                 set @variables.offers_summary = @outputs.offersSummary
+                set @variables.top_offer_summary = @outputs.topOfferSummary
+                set @variables.more_offers_summary = @outputs.moreOffersSummary
                 set @variables.offer_count = @outputs.offerCount
                 set @variables.customer_known = @outputs.identifiedFlag
 
-            | You are chatting with the customer on a messaging app. Keep replies short and friendly,
-              like WhatsApp messages, and use a warm, helpful tone.
+            | You are chatting with the customer on a messaging app. Keep every reply SHORT and
+              punchy like a WhatsApp message, and use upbeat, high-energy, enthusiastic language
+              (a tasteful emoji or two is welcome).
 
             if @variables.customer_known == 0:
                 | We do NOT know who this customer is yet (no account on file).
@@ -76,20 +85,22 @@ subagent offer_discovery:
                     couldn't find an account under that name and ask them to double-check the exact name.
 
             if @variables.customer_known == 1 and @variables.offer_count == 0:
-                | There are no offers available for this customer right now. Let them know politely and
-                  offer to help with any questions about our plans.
+                | There are no offers available for this customer right now. Let them know with a warm,
+                  upbeat tone and offer to help with any questions about our plans.
 
             if @variables.customer_known == 1 and @variables.offer_count != 0:
-                | Present the offers below to the customer in an inviting way. Use the exact offer names,
-                  prices, and discounts from the text - do NOT paraphrase numbers, invent offers, or change
-                  any values. After presenting them, invite the customer to ask about any offer.
+                | Present ONLY the single most relevant offer below, as ONE bullet point. Make it exciting
+                  and personal: weave in the "Why it fits you" reason, and mention the expiry to create a
+                  little urgency. Use the exact offer name, price, and discount from the text - never
+                  paraphrase numbers, invent offers, or change any values. Do NOT list or hint at any
+                  other specific offers. Finish with one short line letting them know you have more great
+                  options and they can just say "show me more".
 
-                  Offers:
-                  {!@variables.offers_summary}
+                  The one offer to present now:
+                  {!@variables.top_offer_summary}
 
-            | When the customer asks about a specific offer, answer using only the information you already
-              retrieved above. Do not re-run a lookup unless the customer asks for an update or a different
-              category. Do NOT use the show_command tool. Always compose your response as direct text.
+            | When the customer asks about this specific offer, answer using only the information above.
+              Do NOT use the show_command tool. Always compose your response as direct text.
 
     actions:
         get_offers:
@@ -102,11 +113,118 @@ subagent offer_discovery:
                     label: "Contact Id"
                     is_required: False
             outputs:
+                topOfferSummary: string
+                    description: "The single most relevant offer, with reason and expiry, to present first."
+                    label: "Top Offer Summary"
+                    is_displayable: False
+                    filter_from_agent: True
+                moreOffersSummary: string
+                    description: "The remaining offers as bullets, shown only when the customer asks for more."
+                    label: "More Offers Summary"
+                    is_displayable: False
+                    filter_from_agent: True
+                offersSummary: string
+                    description: "Readable list of all offers."
+                    label: "Offers Summary"
+                    is_displayable: False
+                    filter_from_agent: True
+                offerCount: integer
+                    description: "Number of offers found for the customer."
+                    label: "Offer Count"
+                    is_displayable: False
+                    filter_from_agent: True
+                identifiedFlag: integer
+                    description: "1 when the customer is identified by contact id, otherwise 0."
+                    label: "Identified Flag"
+                    is_displayable: False
+                    filter_from_agent: True
+        get_offers_by_name:
+            description: "Finds a contact by name and returns their active, non-expired offers."
+            label: "Get Offers By Name"
+            target: "apex://GetOffersByName"
+            inputs:
+                customerName: string
+                    description: "The customer's full name exactly as they provided it."
+                    label: "Customer Name"
+                    is_required: False
+            outputs:
                 offersSummary: string
                     description: "Readable list of offers to present to the customer."
                     label: "Offers Summary"
                     is_displayable: True
                     filter_from_agent: False
+                customerFound: boolean
+                    description: "True when a matching contact was found."
+                    label: "Customer Found"
+                    is_displayable: False
+                    filter_from_agent: False
+                matchedName: string
+                    description: "The full name of the matched contact."
+                    label: "Matched Name"
+                    is_displayable: True
+                    filter_from_agent: False
+                offerCount: integer
+                    description: "Number of offers found for the customer."
+                    label: "Offer Count"
+                    is_displayable: False
+                    filter_from_agent: True
+
+subagent more_offers:
+    label: "More Offers"
+    description: "Show the customer the rest of their offers (beyond the top one) when they ask to see more."
+
+    reasoning:
+        instructions: ->
+            run @actions.get_offers
+                with contactId = @variables.Contact_Id
+                set @variables.top_offer_summary = @outputs.topOfferSummary
+                set @variables.more_offers_summary = @outputs.moreOffersSummary
+                set @variables.offer_count = @outputs.offerCount
+                set @variables.customer_known = @outputs.identifiedFlag
+
+            | Keep it SHORT, upbeat and high-energy (a tasteful emoji or two is welcome), like a WhatsApp
+              message.
+
+            if @variables.more_offers_summary == "":
+                | That top pick is actually the only offer available right now - let them know with an
+                  upbeat tone and invite any questions about it.
+
+            if @variables.more_offers_summary != "":
+                | Present these additional offers as bullet points in an energetic, inviting style. Use the
+                  exact offer names, prices, and discounts from the text - never paraphrase numbers, invent
+                  offers, or change any values. Then invite them to ask about any one of them.
+
+                  More offers:
+                  {!@variables.more_offers_summary}
+
+            | Do NOT use the show_command tool. Always compose your response as direct text.
+
+    actions:
+        get_offers:
+            description: "Returns the active, non-expired offers targeted to the given contact."
+            label: "Get Offers"
+            target: "apex://GetOffersForContact"
+            inputs:
+                contactId: string
+                    description: "Salesforce Contact Id of the connected customer."
+                    label: "Contact Id"
+                    is_required: False
+            outputs:
+                topOfferSummary: string
+                    description: "The single most relevant offer, with reason and expiry, to present first."
+                    label: "Top Offer Summary"
+                    is_displayable: False
+                    filter_from_agent: True
+                moreOffersSummary: string
+                    description: "The remaining offers as bullets, shown only when the customer asks for more."
+                    label: "More Offers Summary"
+                    is_displayable: False
+                    filter_from_agent: True
+                offersSummary: string
+                    description: "Readable list of all offers."
+                    label: "Offers Summary"
+                    is_displayable: False
+                    filter_from_agent: True
                 offerCount: integer
                     description: "Number of offers found for the customer."
                     label: "Offer Count"

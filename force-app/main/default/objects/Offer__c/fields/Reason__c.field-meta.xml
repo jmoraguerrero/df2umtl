@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Reason__c</fullName>
+    <label>Reason</label>
+    <description>Why this offer is relevant for the contact (e.g. loyalty, win-back, an upgrade of an existing product). The agent uses this to personalize the message.</description>
+    <inlineHelpText>A short, personalized reason this offer fits the customer (used in the chat message).</inlineHelpText>
+    <type>LongTextArea</type>
+    <length>1000</length>
+    <visibleLines>3</visibleLines>
+</CustomField>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>RelevanceScore__c</fullName>
+    <label>Relevance Score</label>
+    <description>How relevant this offer is for the contact. The agent presents the highest-scoring offer first.</description>
+    <inlineHelpText>Higher means more relevant. The top-scoring offer is shown first.</inlineHelpText>
+    <type>Number</type>
+    <precision>5</precision>
+    <scale>0</scale>
+</CustomField>

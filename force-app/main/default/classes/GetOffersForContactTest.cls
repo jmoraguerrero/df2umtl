@@ -46,6 +46,33 @@ private class GetOffersForContactTest {
     }
 
     @IsTest
+    static void ordersByRelevanceAndSplitsTopVsMore() {
+        Contact c = makeContact();
+        Offer__c high = makeOffer(c.Id, 'Top Pick', 'Mobile', 55, 10, true, Date.today().addDays(10));
+        high.RelevanceScore__c = 100;
+        high.Reason__c = 'Upgrade of your current plan';
+        Offer__c mid = makeOffer(c.Id, 'Second Choice', 'Internet', 70, 30, true, null);
+        mid.RelevanceScore__c = 50;
+        insert new List<Offer__c>{ mid, high };
+
+        GetOffersForContact.Request req = new GetOffersForContact.Request();
+        req.contactId = c.Id;
+
+        Test.startTest();
+        List<GetOffersForContact.Response> result =
+            GetOffersForContact.getOffers(new List<GetOffersForContact.Request>{ req });
+        Test.stopTest();
+
+        GetOffersForContact.Response res = result[0];
+        System.assertEquals(2, res.offerCount);
+        System.assertEquals('Top Pick', res.offers[0].name, 'Highest relevance should rank first even with a lower discount');
+        System.assert(res.topOfferSummary.contains('Top Pick'), res.topOfferSummary);
+        System.assert(res.topOfferSummary.contains('Upgrade of your current plan'), 'Top summary should include the reason');
+        System.assert(res.moreOffersSummary.contains('Second Choice'), res.moreOffersSummary);
+        System.assert(!res.topOfferSummary.contains('Second Choice'), 'Top summary should contain only the top offer');
+    }
+
+    @IsTest
     static void handlesNoOffers() {
         Contact c = makeContact();
         GetOffersForContact.Request req = new GetOffersForContact.Request();
