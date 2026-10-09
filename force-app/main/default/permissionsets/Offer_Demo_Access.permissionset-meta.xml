@@ -19,6 +19,18 @@
         <apexClass>AgentDemoResource</apexClass>
         <enabled>true</enabled>
     </classAccesses>
+    <classAccesses>
+        <apexClass>SwagQuizService</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>SwagQuizBegin</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>SwagQuizAnswer</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
     <objectPermissions>
         <object>Offer__c</object>
         <allowRead>true</allowRead>
@@ -33,6 +45,33 @@
         <allowRead>true</allowRead>
         <allowCreate>false</allowCreate>
         <allowEdit>false</allowEdit>
+        <allowDelete>false</allowDelete>
+        <viewAllRecords>true</viewAllRecords>
+        <modifyAllRecords>false</modifyAllRecords>
+    </objectPermissions>
+    <objectPermissions>
+        <object>Swag__c</object>
+        <allowRead>true</allowRead>
+        <allowCreate>false</allowCreate>
+        <allowEdit>false</allowEdit>
+        <allowDelete>false</allowDelete>
+        <viewAllRecords>true</viewAllRecords>
+        <modifyAllRecords>false</modifyAllRecords>
+    </objectPermissions>
+    <objectPermissions>
+        <object>Swag_Question__c</object>
+        <allowRead>true</allowRead>
+        <allowCreate>false</allowCreate>
+        <allowEdit>false</allowEdit>
+        <allowDelete>false</allowDelete>
+        <viewAllRecords>true</viewAllRecords>
+        <modifyAllRecords>false</modifyAllRecords>
+    </objectPermissions>
+    <objectPermissions>
+        <object>Swag_Response__c</object>
+        <allowRead>true</allowRead>
+        <allowCreate>true</allowCreate>
+        <allowEdit>true</allowEdit>
         <allowDelete>false</allowDelete>
         <viewAllRecords>true</viewAllRecords>
         <modifyAllRecords>false</modifyAllRecords>
@@ -79,6 +118,81 @@
     </fieldPermissions>
     <fieldPermissions>
         <field>Offer__c.Reason__c</field>
+        <readable>true</readable>
+        <editable>true</editable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Swag__c.Description__c</field>
+        <readable>true</readable>
+        <editable>false</editable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Swag__c.Min_Score__c</field>
+        <readable>true</readable>
+        <editable>false</editable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Swag__c.Max_Score__c</field>
+        <readable>true</readable>
+        <editable>false</editable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Swag__c.Emoji__c</field>
+        <readable>true</readable>
+        <editable>false</editable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Swag__c.Active__c</field>
+        <readable>true</readable>
+        <editable>false</editable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Swag_Question__c.Question_Text__c</field>
+        <readable>true</readable>
+        <editable>false</editable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Swag_Question__c.Order__c</field>
+        <readable>true</readable>
+        <editable>false</editable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Swag_Question__c.Options__c</field>
+        <readable>true</readable>
+        <editable>false</editable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Swag_Question__c.Active__c</field>
+        <readable>true</readable>
+        <editable>false</editable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Swag_Response__c.Contact__c</field>
+        <readable>true</readable>
+        <editable>true</editable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Swag_Response__c.Assigned_Swag__c</field>
+        <readable>true</readable>
+        <editable>true</editable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Swag_Response__c.Completed__c</field>
+        <readable>true</readable>
+        <editable>true</editable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Swag_Response__c.Total_Score__c</field>
+        <readable>true</readable>
+        <editable>true</editable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Swag_Response__c.Answers__c</field>
+        <readable>true</readable>
+        <editable>true</editable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Swag_Response__c.Completed_Date__c</field>
         <readable>true</readable>
         <editable>true</editable>
     </fieldPermissions>

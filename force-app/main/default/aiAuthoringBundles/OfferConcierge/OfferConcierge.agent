@@ -25,6 +25,14 @@ variables:
         description: "How many offers were found for the connected customer."
     customer_known: mutable number = 0
         description: "1 when the connected customer is already identified by a contact id, otherwise 0."
+    quiz_reply: mutable string = ""
+        description: "The exact next thing to say in the swag quiz (the next question with options, or the final result), returned by the Record Swag Answer action."
+    quiz_done: mutable number = 0
+        description: "1 when the swag quiz is finished and a swag has been awarded (or was already won), otherwise 0."
+    quiz_total: mutable number = 0
+        description: "Total number of questions in the swag quiz."
+    quiz_answered: mutable number = 0
+        description: "1-based number of the quiz question currently being asked (or the total when the quiz is done)."
 
 language:
     default_locale: "en_US"
@@ -41,6 +49,11 @@ start_agent agent_router:
               Route greetings and anything about offers, plans, prices, discounts, eligibility, or a
               request to find an account by name to offer discovery. Offer discovery handles both
               customers we already know and customers we still need to identify.
+              Route anything about the quiz, winning swag/prizes/merch, or "what swag/prize could I win"
+              to the swag quiz.
+              IMPORTANT: If your most recent message to the customer was a swag quiz question (one that
+              offered answer options), treat the customer's reply as their quiz answer and route it to the
+              swag quiz, even if the reply is a single word.
               Use off topic only for clearly unrelated requests, and ambiguous question only when the
               message is too vague to act on.
         actions:
@@ -48,6 +61,8 @@ start_agent agent_router:
                 description: "For greetings and the first ask about offers, plans, prices, discounts, eligibility, or identifying the customer by name. Presents the single best offer."
             go_to_more_offers: @utils.transition to @subagent.more_offers
                 description: "When the customer asks to see more, other, or additional offers / options (e.g. 'show me more', 'what else do you have', 'other offers')."
+            go_to_swag_quiz: @utils.transition to @subagent.swag_quiz
+                description: "When the customer wants to play the quiz, win swag/a prize/merch, see what swag they could win, or is replying to a swag quiz question you just asked."
             go_to_off_topic: @utils.transition to @subagent.off_topic
                 description: "For requests clearly unrelated to offers or plans."
             go_to_ambiguous_question: @utils.transition to @subagent.ambiguous_question
@@ -94,9 +109,10 @@ subagent offer_discovery:
                   little urgency. Use the exact offer name, price, and discount from the text - never
                   paraphrase numbers, invent offers, or change any values. Do NOT list or hint at any
                   other specific offers. Finish with one short, natural line - like a helpful person would -
-                  gently offering to walk them through their other options if they're interested. Never tell
-                  them to type or say a specific phrase or command (no "just say ...", no quoted keywords);
-                  keep it conversational.
+                  gently letting them know you can walk them through their other options, or that they could
+                  play a quick, fun quiz to win some swag, if either sounds good. Never tell them to type or
+                  say a specific phrase or command (no "just say ...", no quoted keywords); keep it
+                  conversational.
 
                   The one offer to present now:
                   {!@variables.top_offer_summary}
@@ -265,6 +281,84 @@ subagent more_offers:
                 offerCount: integer
                     description: "Number of offers found for the customer."
                     label: "Offer Count"
+                    is_displayable: False
+                    filter_from_agent: True
+
+subagent swag_quiz:
+    label: "Swag Quiz"
+    description: "Run a short, fun quiz, one question at a time, and award the customer a swag based on their answers. Shows the prior result if they already played (no retakes)."
+
+    reasoning:
+        instructions: ->
+            run @actions.record_swag_answer
+                with contactId = @variables.Contact_Id
+                with userMessage = @system_variables.user_input
+                set @variables.quiz_reply = @outputs.replyText
+                set @variables.quiz_done = @outputs.done
+                set @variables.quiz_total = @outputs.totalQuestions
+                set @variables.quiz_answered = @outputs.questionNumber
+
+            | Keep every reply SHORT, warm, upbeat and WhatsApp-style (a tasteful emoji is welcome).
+              You do NOT know the quiz questions, options, or swags yourself - the text below is the ONLY
+              source of truth. NEVER invent, guess, paraphrase, add, remove, reword, or reorder anything in it.
+
+            if @variables.quiz_done == 0:
+                | Present the following to the customer EXACTLY, keeping the question and ALL of its answer
+                  options intact. You may add a short, warm one-line lead-in before it, but do not add
+                  anything after the options and do not change any option:
+                  {!@variables.quiz_reply}
+
+            if @variables.quiz_done == 1:
+                | The quiz is complete! Enthusiastically share this exact result with the customer (keep the
+                  swag name and details as written), then let them know you're happy to keep helping with
+                  their offers whenever they like:
+                  {!@variables.quiz_reply}
+
+            | Do NOT use the show_command tool. Always compose your response as direct text.
+
+    actions:
+        record_swag_answer:
+            description: "Records the customer's answer, advances the quiz, and awards a swag once all questions are answered."
+            label: "Record Swag Answer"
+            target: "apex://SwagQuizAnswer"
+            inputs:
+                contactId: string
+                    description: "Salesforce Contact Id of the connected customer."
+                    label: "Contact Id"
+                    is_required: False
+                userMessage: string
+                    description: "The customer's latest message, word for word, as their answer to the current question."
+                    label: "User Message"
+                    is_required: False
+            outputs:
+                replyText: string
+                    description: "Exactly what to present next: the next question with options, or the final result."
+                    label: "Reply Text"
+                    is_displayable: True
+                    filter_from_agent: False
+                done: integer
+                    description: "1 when the quiz is finished and a swag has been awarded, otherwise 0."
+                    label: "Done"
+                    is_displayable: False
+                    filter_from_agent: True
+                totalQuestions: integer
+                    description: "Total number of questions in the quiz."
+                    label: "Total Questions"
+                    is_displayable: False
+                    filter_from_agent: True
+                questionNumber: integer
+                    description: "1-based number of the question being asked, or the total when done."
+                    label: "Question Number"
+                    is_displayable: False
+                    filter_from_agent: True
+                alreadyCompleted: integer
+                    description: "1 when the contact had already finished the quiz before this turn."
+                    label: "Already Completed"
+                    is_displayable: False
+                    filter_from_agent: True
+                swagName: string
+                    description: "Name of the awarded swag."
+                    label: "Swag Name"
                     is_displayable: False
                     filter_from_agent: True
 

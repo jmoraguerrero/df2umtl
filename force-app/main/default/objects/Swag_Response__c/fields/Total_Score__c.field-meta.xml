@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Total_Score__c</fullName>
+    <label>Total Score</label>
+    <description>Sum of the scores of the options the contact selected across all quiz questions.</description>
+    <inlineHelpText>The contact's total quiz score, used to match a swag band.</inlineHelpText>
+    <type>Number</type>
+    <precision>5</precision>
+    <scale>0</scale>
+</CustomField>

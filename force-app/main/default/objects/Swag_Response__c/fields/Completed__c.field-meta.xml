@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Completed__c</fullName>
+    <label>Completed</label>
+    <description>True once the contact has finished the quiz and been awarded a swag. Used to prevent retakes.</description>
+    <inlineHelpText>Checked when the quiz is complete and a swag has been assigned.</inlineHelpText>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+</CustomField>

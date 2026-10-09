@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Emoji__c</fullName>
+    <label>Emoji</label>
+    <description>Optional emoji the agent can use when presenting this swag to make the reward feel fun.</description>
+    <inlineHelpText>A single emoji that represents this swag (optional).</inlineHelpText>
+    <type>Text</type>
+    <length>10</length>
+    <required>false</required>
+</CustomField>

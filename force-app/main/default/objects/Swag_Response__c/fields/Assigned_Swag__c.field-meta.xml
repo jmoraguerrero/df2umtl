@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Assigned_Swag__c</fullName>
+    <label>Assigned Swag</label>
+    <description>The swag awarded to the contact based on their total quiz score.</description>
+    <inlineHelpText>The swag this contact won.</inlineHelpText>
+    <type>Lookup</type>
+    <referenceTo>Swag__c</referenceTo>
+    <relationshipLabel>Swag Responses</relationshipLabel>
+    <relationshipName>Swag_Responses</relationshipName>
+    <required>false</required>
+    <deleteConstraint>SetNull</deleteConstraint>
+</CustomField>

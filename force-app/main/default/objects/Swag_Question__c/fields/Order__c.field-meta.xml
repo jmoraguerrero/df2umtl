@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Order__c</fullName>
+    <label>Order</label>
+    <description>The sequence position of this question in the quiz. Lower numbers are asked first.</description>
+    <inlineHelpText>1 for the first question, 2 for the second, and so on.</inlineHelpText>
+    <type>Number</type>
+    <precision>3</precision>
+    <scale>0</scale>
+</CustomField>

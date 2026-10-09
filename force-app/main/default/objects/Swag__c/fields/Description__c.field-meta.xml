@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Description__c</fullName>
+    <label>Description</label>
+    <description>Customer-facing description of the swag, used by the agent to describe the prize the customer won.</description>
+    <inlineHelpText>Write a short, fun description the agent can read out when awarding this swag.</inlineHelpText>
+    <type>LongTextArea</type>
+    <length>1000</length>
+    <visibleLines>3</visibleLines>
+</CustomField>

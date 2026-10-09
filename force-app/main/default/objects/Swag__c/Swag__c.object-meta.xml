@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Swag</label>
+    <pluralLabel>Swag</pluralLabel>
+    <description>A swag/prize item that the agent can award to a contact based on their quiz score band.</description>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>ReadWrite</sharingModel>
+    <visibility>Public</visibility>
+    <enableSearch>true</enableSearch>
+    <enableReports>true</enableReports>
+    <enableActivities>false</enableActivities>
+    <enableHistory>true</enableHistory>
+    <nameField>
+        <label>Swag Name</label>
+        <type>Text</type>
+    </nameField>
+</CustomObject>
