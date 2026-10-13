@@ -31,6 +31,18 @@
         <apexClass>SwagQuizAnswer</apexClass>
         <enabled>true</enabled>
     </classAccesses>
+    <classAccesses>
+        <apexClass>GetOffersForCustomer</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>SaveLeadProfile</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>OfferPresentationUtil</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
     <objectPermissions>
         <object>Offer__c</object>
         <allowRead>true</allowRead>
@@ -45,6 +57,15 @@
         <allowRead>true</allowRead>
         <allowCreate>false</allowCreate>
         <allowEdit>false</allowEdit>
+        <allowDelete>false</allowDelete>
+        <viewAllRecords>true</viewAllRecords>
+        <modifyAllRecords>false</modifyAllRecords>
+    </objectPermissions>
+    <objectPermissions>
+        <object>Lead</object>
+        <allowRead>true</allowRead>
+        <allowCreate>true</allowCreate>
+        <allowEdit>true</allowEdit>
         <allowDelete>false</allowDelete>
         <viewAllRecords>true</viewAllRecords>
         <modifyAllRecords>false</modifyAllRecords>
@@ -98,6 +119,11 @@
     </fieldPermissions>
     <fieldPermissions>
         <field>Offer__c.Contact__c</field>
+        <readable>true</readable>
+        <editable>true</editable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Offer__c.Lead__c</field>
         <readable>true</readable>
         <editable>true</editable>
     </fieldPermissions>
@@ -168,6 +194,11 @@
     </fieldPermissions>
     <fieldPermissions>
         <field>Swag_Response__c.Contact__c</field>
+        <readable>true</readable>
+        <editable>true</editable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Swag_Response__c.Lead__c</field>
         <readable>true</readable>
         <editable>true</editable>
     </fieldPermissions>

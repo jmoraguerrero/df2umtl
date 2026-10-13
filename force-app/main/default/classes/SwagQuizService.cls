@@ -17,6 +17,7 @@ public with sharing class SwagQuizService {
     /** Shared result shape returned to both invocable wrappers. */
     public class Result {
         public String contactIdEcho;
+        public String leadIdEcho;
         public Integer alreadyCompleted = 0; // 1 when the quiz was already finished
         public Integer done = 0;             // 1 when the quiz is finished (now or before)
         public String replyText;             // the next thing the agent should say
@@ -45,13 +46,19 @@ public with sharing class SwagQuizService {
      * result instead of letting them retake it).
      */
     public static Result status(String contactId) {
+        return status(contactId, null);
+    }
+
+    public static Result status(String contactId, String leadId) {
         Result r = new Result();
         r.contactIdEcho = contactId;
-        if (String.isBlank(contactId) || !(contactId instanceof Id)) {
+        r.leadIdEcho = leadId;
+        Id customerId = resolveCustomerId(contactId, leadId);
+        if (customerId == null) {
             r.replyText = 'I could not identify your account, so I can\'t start the quiz right now.';
             return r;
         }
-        Swag_Response__c existing = findResponse((Id) contactId);
+        Swag_Response__c existing = findResponse(customerId);
         if (existing != null && existing.Completed__c) {
             r.alreadyCompleted = 1;
             r.done = 1;
@@ -66,13 +73,18 @@ public with sharing class SwagQuizService {
      * advances the quiz. When all questions are answered, scores and awards a swag.
      */
     public static Result answer(String contactId, String userMessage) {
+        return answer(contactId, null, userMessage);
+    }
+
+    public static Result answer(String contactId, String leadId, String userMessage) {
         Result r = new Result();
         r.contactIdEcho = contactId;
-        if (String.isBlank(contactId) || !(contactId instanceof Id)) {
+        r.leadIdEcho = leadId;
+        Id customerId = resolveCustomerId(contactId, leadId);
+        if (customerId == null) {
             r.replyText = 'I could not identify your account, so I can\'t run the quiz right now.';
             return r;
         }
-        Id cId = (Id) contactId;
 
         List<Swag_Question__c> questions = getQuestions();
         if (questions.isEmpty()) {
@@ -81,7 +93,7 @@ public with sharing class SwagQuizService {
         }
         r.totalQuestions = questions.size();
 
-        Swag_Response__c resp = findResponse(cId);
+        Swag_Response__c resp = findResponse(customerId);
         if (resp != null && resp.Completed__c) {
             // Already finished - show the prior result, never retake.
             r.alreadyCompleted = 1;
@@ -93,7 +105,12 @@ public with sharing class SwagQuizService {
             return r;
         }
         if (resp == null) {
-            resp = new Swag_Response__c(Contact__c = cId, Completed__c = false, Answers__c = '[]');
+            resp = new Swag_Response__c(Completed__c = false, Answers__c = '[]');
+            if (isLeadId(customerId)) {
+                resp.Lead__c = customerId;
+            } else {
+                resp.Contact__c = customerId;
+            }
             insert resp;
         }
 
@@ -165,16 +182,58 @@ public with sharing class SwagQuizService {
         ];
     }
 
-    private static Swag_Response__c findResponse(Id contactId) {
-        List<Swag_Response__c> rows = [
-            SELECT Id, Contact__c, Completed__c, Total_Score__c, Answers__c,
-                   Assigned_Swag__c, Assigned_Swag__r.Name, Assigned_Swag__r.Description__c,
-                   Assigned_Swag__r.Emoji__c
-            FROM Swag_Response__c
-            WHERE Contact__c = :contactId
-            ORDER BY Completed__c DESC, LastModifiedDate DESC
+    public static String resolveLeadIdByEmail(String email) {
+        if (String.isBlank(email) || !email.contains('@')) {
+            return null;
+        }
+        String normalized = email.trim().toLowerCase();
+        List<Lead> rows = [
+            SELECT Id
+            FROM Lead
+            WHERE Email = :normalized
+            ORDER BY CreatedDate DESC
             LIMIT 1
         ];
+        return rows.isEmpty() ? null : String.valueOf(rows[0].Id);
+    }
+
+    private static Id resolveCustomerId(String contactId, String leadId) {
+        if (String.isNotBlank(contactId) && contactId instanceof Id) {
+            return (Id) contactId;
+        }
+        if (String.isNotBlank(leadId) && leadId instanceof Id) {
+            return (Id) leadId;
+        }
+        return null;
+    }
+
+    private static Boolean isLeadId(Id recordId) {
+        return recordId.getSObjectType() == Lead.SObjectType;
+    }
+
+    private static Swag_Response__c findResponse(Id customerId) {
+        List<Swag_Response__c> rows;
+        if (isLeadId(customerId)) {
+            rows = [
+                SELECT Id, Contact__c, Lead__c, Completed__c, Total_Score__c, Answers__c,
+                       Assigned_Swag__c, Assigned_Swag__r.Name, Assigned_Swag__r.Description__c,
+                       Assigned_Swag__r.Emoji__c
+                FROM Swag_Response__c
+                WHERE Lead__c = :customerId
+                ORDER BY Completed__c DESC, LastModifiedDate DESC
+                LIMIT 1
+            ];
+        } else {
+            rows = [
+                SELECT Id, Contact__c, Lead__c, Completed__c, Total_Score__c, Answers__c,
+                       Assigned_Swag__c, Assigned_Swag__r.Name, Assigned_Swag__r.Description__c,
+                       Assigned_Swag__r.Emoji__c
+                FROM Swag_Response__c
+                WHERE Contact__c = :customerId
+                ORDER BY Completed__c DESC, LastModifiedDate DESC
+                LIMIT 1
+            ];
+        }
         return rows.isEmpty() ? null : rows[0];
     }
 

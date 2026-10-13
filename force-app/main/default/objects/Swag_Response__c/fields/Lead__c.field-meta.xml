@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Lead__c</fullName>
+    <label>Lead</label>
+    <description>The lead who took the swag quiz. One response record per lead (when not using Contact).</description>
+    <type>Lookup</type>
+    <referenceTo>Lead</referenceTo>
+    <relationshipLabel>Swag Responses</relationshipLabel>
+    <relationshipName>Swag_Responses</relationshipName>
+    <required>false</required>
+    <deleteConstraint>SetNull</deleteConstraint>
+</CustomField>

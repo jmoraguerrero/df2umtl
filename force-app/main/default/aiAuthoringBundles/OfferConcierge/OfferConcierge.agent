@@ -15,6 +15,13 @@ variables:
     Contact_Id: mutable string = ""
         visibility: "External"
         description: "Salesforce Contact Id of the connected customer, supplied by the web broker through the Agent API. Used to look up the customer's offers."
+    Lead_Id: mutable string = ""
+        visibility: "External"
+        description: "Salesforce Lead Id after chat intake and confirmation. Used for offers and quiz when no Contact_Id is present."
+    intake_complete: mutable number = 0
+        description: "1 after the customer's details were confirmed and saved as a Lead, otherwise 0."
+    prospect_email: mutable string = ""
+        description: "Email collected during intake; used to load offers and quiz for the Lead when Lead_Id is not yet set."
     offers_summary: mutable string = ""
         description: "The latest formatted offers text (all offers) returned by the get_offers action."
     top_offer_summary: mutable string = ""
@@ -46,36 +53,109 @@ start_agent agent_router:
     reasoning:
         instructions: ->
             | Route the customer's message to the right subagent.
-              Route greetings and anything about offers, plans, prices, discounts, eligibility, or a
-              request to find an account by name to offer discovery. Offer discovery handles both
-              customers we already know and customers we still need to identify.
+              If Contact_Id is empty AND intake_complete is 0, route to customer intake (collect name,
+              email, phone, confirm, then save as a Lead) — except when you are mid swag quiz question.
+              Once Contact_Id is set OR intake_complete is 1, route greetings and anything about offers,
+              plans, prices, discounts, or eligibility to offer discovery.
               Route anything about the quiz, winning swag/prizes/merch, or "what swag/prize could I win"
-              to the swag quiz.
+              to the swag quiz ONLY when Contact_Id is set OR intake_complete is 1 (Lead saved).
               IMPORTANT: If your most recent message to the customer was a swag quiz question (one that
               offered answer options), treat the customer's reply as their quiz answer and route it to the
               swag quiz, even if the reply is a single word.
               Use off topic only for clearly unrelated requests, and ambiguous question only when the
               message is too vague to act on.
         actions:
+            go_to_customer_intake: @utils.transition to @subagent.customer_intake
+                description: "When Contact_Id and Lead_Id are both empty: collect first name, last name, email, phone, confirm, then save as a Lead."
             go_to_offer_discovery: @utils.transition to @subagent.offer_discovery
-                description: "For greetings and the first ask about offers, plans, prices, discounts, eligibility, or identifying the customer by name. Presents the single best offer."
+                description: "When the customer is identified (Contact_Id or Lead_Id set): offers, plans, prices, discounts, eligibility."
             go_to_more_offers: @utils.transition to @subagent.more_offers
                 description: "When the customer asks to see more, other, or additional offers / options (e.g. 'show me more', 'what else do you have', 'other offers')."
             go_to_swag_quiz: @utils.transition to @subagent.swag_quiz
-                description: "When the customer wants to play the quiz, win swag/a prize/merch, see what swag they could win, or is replying to a swag quiz question you just asked."
+                description: "When Contact_Id or Lead_Id is set and the customer wants the quiz, swag, a prize, or is answering a quiz question you just asked."
             go_to_off_topic: @utils.transition to @subagent.off_topic
                 description: "For requests clearly unrelated to offers or plans."
             go_to_ambiguous_question: @utils.transition to @subagent.ambiguous_question
                 description: "When the request is too vague or unclear to act on."
 
+subagent customer_intake:
+    label: "Customer Intake"
+    description: "Collect first name, last name, email, and phone from new chat visitors; confirm; save as a Lead."
+
+    reasoning:
+        instructions: ->
+            | You are onboarding a new visitor on a messaging app. Keep replies SHORT and warm.
+              We do NOT have Contact_Id or Lead_Id yet. Collect details in order, one step at a time when
+              possible:
+                1) First and last name (if they give one full name, split into first and last yourself;
+                   if unclear, ask which is first vs last).
+                2) Email address (store it in prospect_email as soon as they provide it).
+                3) Phone number.
+                4) Recap ALL fields and ask them to confirm we should save their details to find their
+                   personalized offers (yes / no). Do NOT call Save Lead Profile until they clearly say yes.
+              When they confirm, call Save Lead Profile with confirmed=true and the collected fields.
+              If save succeeds, store the returned Lead Id in Lead_Id, set intake_complete to 1, keep their
+              email in prospect_email, and warmly welcome them — then offer to show their personalized offers.
+              If they decline or want a correction, fix the field they mention and recap again.
+              Never invent email or phone. Never save without explicit confirmation.
+
+    actions:
+        save_lead_profile:
+            description: "Saves the customer's confirmed details as a Lead in Salesforce."
+            label: "Save Lead Profile"
+            target: "apex://SaveLeadProfile"
+            inputs:
+                firstName: string
+                    description: "Customer first name."
+                    label: "First Name"
+                    is_required: False
+                lastName: string
+                    description: "Customer last name."
+                    label: "Last Name"
+                    is_required: False
+                fullName: string
+                    description: "Full name if first/last were given together."
+                    label: "Full Name"
+                    is_required: False
+                email: string
+                    description: "Customer email."
+                    label: "Email"
+                    is_required: False
+                phone: string
+                    description: "Customer phone."
+                    label: "Phone"
+                    is_required: False
+                confirmed: boolean
+                    description: "True only after the customer explicitly agreed to save."
+                    label: "Confirmed"
+                    is_required: True
+            outputs:
+                success: boolean
+                    description: "True when the lead was saved."
+                    label: "Success"
+                    is_displayable: False
+                    filter_from_agent: True
+                leadId: string
+                    description: "Salesforce Lead Id to use for offers and quiz."
+                    label: "Lead Id"
+                    is_displayable: False
+                    filter_from_agent: True
+                message: string
+                    description: "Result message from the save action."
+                    label: "Message"
+                    is_displayable: False
+                    filter_from_agent: True
+
 subagent offer_discovery:
     label: "Offer Discovery"
-    description: "Identify the customer when needed, then find and present their personalized offers and answer follow-up questions about them (price, discount, what's included, expiry)."
+    description: "Find and present personalized offers for the identified Contact or Lead."
 
     reasoning:
         instructions: ->
             run @actions.get_offers
                 with contactId = @variables.Contact_Id
+                with leadId = @variables.Lead_Id
+                with email = @variables.prospect_email
                 set @variables.offers_summary = @outputs.offersSummary
                 set @variables.top_offer_summary = @outputs.topOfferSummary
                 set @variables.more_offers_summary = @outputs.moreOffersSummary
@@ -87,17 +167,8 @@ subagent offer_discovery:
               (a tasteful emoji or two is welcome).
 
             if @variables.customer_known == 0:
-                | We do NOT know who this customer is yet (no account on file).
-                  - If the customer has NOT yet told you their name, warmly greet them and ask for their
-                    full name so you can look up their personalized offers. Ask ONLY for the name and do
-                    NOT call any action yet.
-                  - As soon as the customer gives you their name, immediately call the Get Offers By Name
-                    action with the exact name they gave. Do NOT reply with filler like "let me check" or
-                    "one moment" - call the action and present the result in the same reply. If a matching
-                    customer was found, greet them by name and present their offers using the exact offer
-                    names, prices, and discounts from the returned Offers Summary - do NOT paraphrase
-                    numbers, invent offers, or change any values. If no match was found, politely say you
-                    couldn't find an account under that name and ask them to double-check the exact name.
+                | The customer is not identified yet. Ask them to complete the quick signup (name, email,
+                  phone) before offers can be shown. Do NOT invent offers.
 
             if @variables.customer_known == 1 and @variables.offer_count == 0:
                 | There are no offers available for this customer right now. Let them know with a warm,
@@ -124,11 +195,17 @@ subagent offer_discovery:
         get_offers:
             description: "Returns the active, non-expired offers targeted to the given contact."
             label: "Get Offers"
-            target: "apex://GetOffersForContact"
+            target: "apex://GetOffersForCustomer"
             inputs:
                 contactId: string
                     description: "Salesforce Contact Id of the connected customer."
                     label: "Contact Id"
+                    is_required: False
+                leadId: string
+                    label: "Lead Id"
+                    is_required: False
+                email: string
+                    label: "Email"
                     is_required: False
             outputs:
                 topOfferSummary: string
@@ -156,37 +233,6 @@ subagent offer_discovery:
                     label: "Identified Flag"
                     is_displayable: False
                     filter_from_agent: True
-        get_offers_by_name:
-            description: "Finds a contact by name and returns their active, non-expired offers."
-            label: "Get Offers By Name"
-            target: "apex://GetOffersByName"
-            inputs:
-                customerName: string
-                    description: "The customer's full name exactly as they provided it."
-                    label: "Customer Name"
-                    is_required: False
-            outputs:
-                offersSummary: string
-                    description: "Readable list of offers to present to the customer."
-                    label: "Offers Summary"
-                    is_displayable: True
-                    filter_from_agent: False
-                customerFound: boolean
-                    description: "True when a matching contact was found."
-                    label: "Customer Found"
-                    is_displayable: False
-                    filter_from_agent: False
-                matchedName: string
-                    description: "The full name of the matched contact."
-                    label: "Matched Name"
-                    is_displayable: True
-                    filter_from_agent: False
-                offerCount: integer
-                    description: "Number of offers found for the customer."
-                    label: "Offer Count"
-                    is_displayable: False
-                    filter_from_agent: True
-
 subagent more_offers:
     label: "More Offers"
     description: "Show the customer the rest of their offers (beyond the top one) when they ask to see more."
@@ -195,6 +241,8 @@ subagent more_offers:
         instructions: ->
             run @actions.get_offers
                 with contactId = @variables.Contact_Id
+                with leadId = @variables.Lead_Id
+                with email = @variables.prospect_email
                 set @variables.top_offer_summary = @outputs.topOfferSummary
                 set @variables.more_offers_summary = @outputs.moreOffersSummary
                 set @variables.offer_count = @outputs.offerCount
@@ -221,11 +269,17 @@ subagent more_offers:
         get_offers:
             description: "Returns the active, non-expired offers targeted to the given contact."
             label: "Get Offers"
-            target: "apex://GetOffersForContact"
+            target: "apex://GetOffersForCustomer"
             inputs:
                 contactId: string
                     description: "Salesforce Contact Id of the connected customer."
                     label: "Contact Id"
+                    is_required: False
+                leadId: string
+                    label: "Lead Id"
+                    is_required: False
+                email: string
+                    label: "Email"
                     is_required: False
             outputs:
                 topOfferSummary: string
@@ -253,37 +307,6 @@ subagent more_offers:
                     label: "Identified Flag"
                     is_displayable: False
                     filter_from_agent: True
-        get_offers_by_name:
-            description: "Finds a contact by name and returns their active, non-expired offers."
-            label: "Get Offers By Name"
-            target: "apex://GetOffersByName"
-            inputs:
-                customerName: string
-                    description: "The customer's full name exactly as they provided it."
-                    label: "Customer Name"
-                    is_required: False
-            outputs:
-                offersSummary: string
-                    description: "Readable list of offers to present to the customer."
-                    label: "Offers Summary"
-                    is_displayable: True
-                    filter_from_agent: False
-                customerFound: boolean
-                    description: "True when a matching contact was found."
-                    label: "Customer Found"
-                    is_displayable: False
-                    filter_from_agent: False
-                matchedName: string
-                    description: "The full name of the matched contact."
-                    label: "Matched Name"
-                    is_displayable: True
-                    filter_from_agent: False
-                offerCount: integer
-                    description: "Number of offers found for the customer."
-                    label: "Offer Count"
-                    is_displayable: False
-                    filter_from_agent: True
-
 subagent swag_quiz:
     label: "Swag Quiz"
     description: "Run a short, fun quiz, one question at a time, and award the customer a swag based on their answers. Shows the prior result if they already played (no retakes)."
@@ -292,6 +315,8 @@ subagent swag_quiz:
         instructions: ->
             run @actions.record_swag_answer
                 with contactId = @variables.Contact_Id
+                with leadId = @variables.Lead_Id
+                with email = @variables.prospect_email
                 with userMessage = @system_variables.user_input
                 set @variables.quiz_reply = @outputs.replyText
                 set @variables.quiz_done = @outputs.done
@@ -323,8 +348,16 @@ subagent swag_quiz:
             target: "apex://SwagQuizAnswer"
             inputs:
                 contactId: string
-                    description: "Salesforce Contact Id of the connected customer."
+                    description: "Salesforce Contact Id when the customer is a contact."
                     label: "Contact Id"
+                    is_required: False
+                leadId: string
+                    description: "Salesforce Lead Id when the customer was captured via intake."
+                    label: "Lead Id"
+                    is_required: False
+                email: string
+                    description: "Prospect email fallback when Lead Id is not set."
+                    label: "Email"
                     is_required: False
                 userMessage: string
                     description: "The customer's latest message, word for word, as their answer to the current question."

@@ -23,9 +23,6 @@
   var sessionId = null;
   var sequenceId = 1;
   var busy = false;
-  // When no contactId is supplied we first ask the customer for their name and
-  // resolve it to a contact before starting the agent session.
-  var awaitingName = false;
 
   function scrollDown() {
     chatBody.scrollTop = chatBody.scrollHeight;
@@ -119,55 +116,13 @@
     }
   }
 
-  // Resolve a typed name to a contact, then start the agent session for them.
-  async function resolveName(name) {
-    setBusy(true);
-    showTyping();
-    try {
-      var data = await postJson("/resolve", { name: name });
-      hideTyping();
-      if (data && data.found) {
-        contactId = data.contactId;
-        awaitingName = false;
-        await startSession();
-      } else if (data && data.ambiguous) {
-        addMessage(
-          "I found more than one account matching that. Could you share your full name (first and last) so I can find the right one?",
-          "in"
-        );
-      } else {
-        addMessage(
-          'I couldn\u2019t find an account under "' +
-            name +
-            '". Please double-check and type your full name exactly as it appears on your account.',
-          "in"
-        );
-      }
-    } catch (e) {
-      hideTyping();
-      showError("Lookup failed: " + e.message);
-    } finally {
-      setBusy(false);
-      input.focus();
-    }
-  }
-
   function init() {
     if (!BASE) {
       showError("Broker URL is not configured (see config.js).");
       return;
     }
-    if (contactId) {
-      startSession();
-    } else {
-      // No contact supplied: ask for the name first (client-side), then resolve.
-      awaitingName = true;
-      addMessage(
-        "Hi! I\u2019m your Offer Concierge. What\u2019s your name so I can find your personalized offers?",
-        "in"
-      );
-      input.focus();
-    }
+    // No contactId: start anonymous session; agent runs Lead intake in chat.
+    startSession();
   }
 
   async function sendToAgent(text, silentOutgoing) {
@@ -202,12 +157,7 @@
     if (!text || busy) return;
     input.value = "";
     refreshActionButton();
-    if (awaitingName) {
-      addMessage(text, "out");
-      resolveName(text);
-    } else {
-      sendToAgent(text, false);
-    }
+    sendToAgent(text, false);
   }
 
   // --- Morphing action button (mic when empty, send when text) ---
@@ -267,12 +217,7 @@
         if (text) {
           input.value = "";
           refreshActionButton();
-          if (awaitingName) {
-            addMessage(text, "out");
-            resolveName(text);
-          } else {
-            sendToAgent(text, false);
-          }
+          sendToAgent(text, false);
         }
       }
     };

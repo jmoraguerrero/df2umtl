@@ -19,6 +19,18 @@ public with sharing class SwagQuizAnswer {
         public String contactId;
         @InvocableVariable(
             required=false
+            label='Lead Id'
+            description='The Salesforce Lead Id when the customer was captured via chat intake.'
+        )
+        public String leadId;
+        @InvocableVariable(
+            required=false
+            label='Email'
+            description='Fallback: find Lead by email when leadId is not set.'
+        )
+        public String email;
+        @InvocableVariable(
+            required=false
             label='User Message'
             description='The customer\'s latest message, word for word, treated as their answer to the current question.'
         )
@@ -47,8 +59,13 @@ public with sharing class SwagQuizAnswer {
     public static List<Response> record(List<Request> requests) {
         List<Response> responses = new List<Response>();
         for (Request req : requests) {
+            String leadId = req == null ? null : req.leadId;
+            if (String.isBlank(leadId) && req != null) {
+                leadId = SwagQuizService.resolveLeadIdByEmail(req.email);
+            }
             SwagQuizService.Result res = SwagQuizService.answer(
                 req == null ? null : req.contactId,
+                leadId,
                 req == null ? null : req.userMessage
             );
             Response out = new Response();

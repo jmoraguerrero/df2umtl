@@ -139,6 +139,25 @@ private class SwagQuizServiceTest {
     }
 
     @IsTest
+    static void fullQuizWorksForLead() {
+        Lead l = new Lead(
+            FirstName = 'Quiz',
+            LastName = 'Lead',
+            Email = 'quiz.lead@example.com',
+            Company = 'Web Chat'
+        );
+        insert l;
+        seedQuiz();
+
+        SwagQuizService.answer(null, l.Id, 'Streaming');
+        SwagQuizService.Result r = SwagQuizService.answer(null, l.Id, 'Adventure');
+
+        System.assertEquals(1, r.done, 'Lead quiz should complete');
+        Swag_Response__c resp = [SELECT Lead__c, Completed__c FROM Swag_Response__c WHERE Lead__c = :l.Id];
+        System.assertEquals(true, resp.Completed__c);
+    }
+
+    @IsTest
     static void invocableWrappers() {
         Contact c = makeContact();
         seedQuiz();
