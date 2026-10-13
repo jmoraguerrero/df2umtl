@@ -154,6 +154,18 @@ body {
   color: #5b5640;
 }
 
+.guide-link {
+  display: inline-block;
+  margin-top: 3px;
+  color: var(--wa-teal, #128c7e);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.guide-link:hover {
+  text-decoration: underline;
+}
+
 /* Bubbles */
 .msg {
   max-width: 82%;
