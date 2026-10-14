@@ -7,7 +7,7 @@ The **canonical** Agent Script in git is under `force-app/.../OfferConcierge.age
 | Path | Purpose |
 |------|---------|
 | `df2umtl/OfferConcierge.agent` | Same script as force-app; user = `offerconcierge.agent@df2umtl.velocityfun.demo` |
-| `partnercentral/OfferConcierge.agent` | Same script; user = `offerconcierge.agent@00dfj00000ryet7ead.org.force.com` |
+| `partnercentral/OfferConcierge.agent` | Same script; **`default_agent_user`** = `offerconcierge@00dfj00000ryet71173413824.ext` (same as committed v1 **Agent Access**) |
 | `*/create_agent_user.apex` | Create Einstein agent user + `Offer_Demo_Access` in that org |
 | `*/set_agent_id.apex` | Org-default `AgentBrokerConfig__c` after publish |
 | `*/org.env.json` | Instance URL, broker URL, agent user (reference only) |
@@ -47,4 +47,4 @@ sf apex run --target-org partnercentral --file org-config/partnercentral/create_
 sf apex run --target-org df2umtl --file org-config/df2umtl/create_agent_user.apex
 ```
 
-Existing user in Partner Central: `005fj00000QD4tHAAT` (`offerconcierge.agent@00dfj00000ryet7ead.org.force.com`).
+Committed agent user (v1 Agent Access): `005fj00000QDTDJAA5` (`offerconcierge@00dfj00000ryet71173413824.ext`). Use this username in `default_agent_user` before **Commit Version**. Alternate manual user: `offerconcierge.agent@00dfj00000ryet7ead.org.force.com`.

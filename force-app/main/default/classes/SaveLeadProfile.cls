@@ -5,6 +5,7 @@
 public with sharing class SaveLeadProfile {
     private static final String DEFAULT_COMPANY = 'Web Chat';
     private static final String LEAD_SOURCE = 'Offer Concierge';
+    private static final String STATUS_QUALIFIED = 'Qualified';
 
     public class Request {
         @InvocableVariable(label='First Name')
@@ -23,6 +24,21 @@ public with sharing class SaveLeadProfile {
             description='Must be true to persist. Customer must have explicitly agreed to save their details.'
         )
         public Boolean confirmed;
+        @InvocableVariable(label='Financial Goal' description='Human-readable goal label from qualification.')
+        public String financialGoal;
+        @InvocableVariable(label='Goal Detail' description='Free-text goal when the customer chose Something else.')
+        public String goalDetail;
+        @InvocableVariable(label='Timeline' description='Timeline label from qualification.')
+        public String timeline;
+        @InvocableVariable(label='Urgency' description='high, medium, or low — maps to Lead Rating when valid.')
+        public String urgency;
+        @InvocableVariable(label='Existing Customer' description='yes or no from qualification.')
+        public String existingCustomer;
+        @InvocableVariable(
+            label='Marketing Consent'
+            description='True when the customer opted in to tailored offers by email.'
+        )
+        public Boolean marketingConsent;
     }
 
     public class Response {
@@ -70,7 +86,8 @@ public with sharing class SaveLeadProfile {
         String phone = String.isBlank(req.phone) ? null : req.phone.trim();
 
         try {
-            Lead saved = new LeadWriter().upsertLead(parts.firstName, parts.lastName, email, phone);
+            Lead saved = new LeadWriter()
+                .upsertLead(parts.firstName, parts.lastName, email, phone, req);
             res.success = true;
             res.leadId = saved.Id;
             res.message = 'Lead saved for ' + parts.firstName + ' ' + parts.lastName + '.';
@@ -127,15 +144,73 @@ public with sharing class SaveLeadProfile {
     }
 
     @TestVisible
+    private static String buildDescription(Request req) {
+        List<String> lines = new List<String>();
+        lines.add('Chat qualification (Offer Concierge)');
+        if (String.isNotBlank(req.financialGoal)) {
+            lines.add('Financial goal: ' + req.financialGoal.trim());
+        }
+        if (String.isNotBlank(req.goalDetail)) {
+            lines.add('Goal detail: ' + req.goalDetail.trim());
+        }
+        if (String.isNotBlank(req.timeline)) {
+            lines.add('Timeline: ' + req.timeline.trim());
+        }
+        if (String.isNotBlank(req.existingCustomer)) {
+            String cust = req.existingCustomer.trim().equalsIgnoreCase('yes')
+                ? 'Existing customer'
+                : 'New to us';
+            lines.add('Customer status: ' + cust);
+        }
+        if (req.marketingConsent != null) {
+            lines.add(
+                'Marketing consent: ' + (req.marketingConsent ? 'Opted in' : 'Not given')
+            );
+        }
+        return String.join(lines, '\n');
+    }
+
+    @TestVisible
+    private static String urgencyToRating(String urgency) {
+        if (String.isBlank(urgency)) {
+            return null;
+        }
+        String u = urgency.trim().toLowerCase();
+        if (u == 'high') {
+            return 'Hot';
+        }
+        if (u == 'medium') {
+            return 'Warm';
+        }
+        if (u == 'low') {
+            return 'Cold';
+        }
+        return null;
+    }
+
+    @TestVisible
+    private static Boolean isActivePicklistValue(Schema.SObjectField field, String value) {
+        if (String.isBlank(value)) {
+            return false;
+        }
+        for (Schema.PicklistEntry pe : field.getDescribe().getPicklistValues()) {
+            if (pe.isActive() && pe.getValue() == value) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @TestVisible
     private class NameParts {
         public String firstName;
         public String lastName;
     }
 
     private without sharing class LeadWriter {
-        Lead upsertLead(String firstName, String lastName, String email, String phone) {
+        Lead upsertLead(String firstName, String lastName, String email, String phone, Request req) {
             List<Lead> existing = [
-                SELECT Id, FirstName, LastName, Email, Phone, Company
+                SELECT Id, FirstName, LastName, Email, Phone, Company, Description
                 FROM Lead
                 WHERE Email = :email
                 ORDER BY CreatedDate DESC
@@ -166,6 +241,24 @@ public with sharing class SaveLeadProfile {
             }
             if (String.isBlank(row.LeadSource)) {
                 row.LeadSource = LEAD_SOURCE;
+            }
+
+            String qualificationNotes = buildDescription(req);
+            if (String.isNotBlank(qualificationNotes)) {
+                row.Description = qualificationNotes;
+            }
+
+            String rating = urgencyToRating(req.urgency);
+            if (isActivePicklistValue(Lead.Rating, rating)) {
+                row.Rating = rating;
+            }
+
+            if (req.marketingConsent != null) {
+                row.HasOptedOutOfEmail = !req.marketingConsent;
+            }
+
+            if (isActivePicklistValue(Lead.Status, STATUS_QUALIFIED)) {
+                row.Status = STATUS_QUALIFIED;
             }
 
             if (row.Id == null) {

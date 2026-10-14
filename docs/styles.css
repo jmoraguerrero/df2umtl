@@ -97,6 +97,12 @@ body {
   opacity: 0.85;
 }
 
+.header-sub {
+  font-size: 12px;
+  opacity: 0.9;
+  line-height: 1.25;
+}
+
 .header-icons {
   display: flex;
   gap: 16px;
@@ -254,6 +260,116 @@ body {
     opacity: 1;
     transform: translateY(-3px);
   }
+}
+
+/* Quick replies & draw form */
+.quick-replies {
+  flex-shrink: 0;
+  padding: 8px 10px 4px;
+  background: #f0f2f5;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.quick-replies[hidden] {
+  display: none !important;
+}
+
+.quick-opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.quick-opt {
+  border: 1.5px solid #c5c9cc;
+  background: #fff;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--wa-text);
+  cursor: pointer;
+}
+
+.quick-opt:hover:not(:disabled) {
+  border-color: var(--wa-teal);
+  background: #e7f5f0;
+}
+
+.quick-opt:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.intake-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.intake-form label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--wa-muted);
+}
+
+.intake-form input[type="text"],
+.intake-form input[type="email"] {
+  width: 100%;
+  font: inherit;
+  font-size: 15px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1.5px solid #c5c9cc;
+  background: #fff;
+}
+
+.intake-form input.bad {
+  border-color: #e3493a;
+}
+
+.intake-form .field-err {
+  font-size: 12px;
+  color: #c0210d;
+  min-height: 0;
+}
+
+.intake-consent {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 12px;
+  color: var(--wa-muted);
+  line-height: 1.35;
+}
+
+.intake-consent input {
+  margin-top: 2px;
+  flex: none;
+}
+
+.intake-submit {
+  align-self: flex-start;
+  border: none;
+  background: var(--wa-teal);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  border-radius: 8px;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+.intake-submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.composer.composer-dimmed {
+  opacity: 0.45;
+  pointer-events: none;
 }
 
 /* Composer */

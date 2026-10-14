@@ -28,10 +28,56 @@ private class SaveLeadProfileTest {
 
         System.assertEquals(true, res.success, res.message);
         System.assertNotEquals(null, res.leadId);
-        Lead l = [SELECT FirstName, LastName, Email, Phone, Company FROM Lead WHERE Id = :res.leadId];
+        Lead l = [
+            SELECT FirstName, LastName, Email, Phone, Company, Description, HasOptedOutOfEmail, Rating, Status
+            FROM Lead
+            WHERE Id = :res.leadId
+        ];
         System.assertEquals('Jordan', l.FirstName);
         System.assertEquals('River', l.LastName);
         System.assertEquals('jordan.river@example.com', l.Email);
+    }
+
+    @IsTest
+    static void savesQualificationOnStandardFields() {
+        SaveLeadProfile.Request req = new SaveLeadProfile.Request();
+        req.firstName = 'Sam';
+        req.lastName = 'Ng';
+        req.email = 'sam.ng@example.com';
+        req.confirmed = true;
+        req.financialGoal = 'Buy a home';
+        req.timeline = 'Within 3 months';
+        req.urgency = 'high';
+        req.existingCustomer = 'no';
+        req.marketingConsent = true;
+
+        Test.startTest();
+        SaveLeadProfile.Response res = SaveLeadProfile.save(new List<SaveLeadProfile.Request>{ req })[0];
+        Test.stopTest();
+
+        System.assertEquals(true, res.success, res.message);
+        Lead l = [
+            SELECT Description, HasOptedOutOfEmail, Rating, Status
+            FROM Lead
+            WHERE Id = :res.leadId
+        ];
+        System.assert(l.Description != null && l.Description.contains('Buy a home'));
+        System.assertEquals(false, l.HasOptedOutOfEmail);
+        if (SaveLeadProfile.isActivePicklistValue(Lead.Rating, 'Hot')) {
+            System.assertEquals('Hot', l.Rating);
+        }
+    }
+
+    @IsTest
+    static void buildDescriptionIncludesConsentNo() {
+        SaveLeadProfile.Request req = new SaveLeadProfile.Request();
+        req.financialGoal = 'Save and invest';
+        req.timeline = 'Just exploring';
+        req.existingCustomer = 'yes';
+        req.marketingConsent = false;
+        String notes = SaveLeadProfile.buildDescription(req);
+        System.assert(notes.contains('Not given'));
+        System.assert(notes.contains('Existing customer'));
     }
 
     @IsTest

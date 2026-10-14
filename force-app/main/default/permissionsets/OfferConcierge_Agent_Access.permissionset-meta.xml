@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <agentAccesses>
+        <agentName>OfferConcierge</agentName>
+        <enabled>true</enabled>
+    </agentAccesses>
+    <description>Grants access to the Offer Concierge service agent for admins and builders.</description>
+    <hasActivationRequired>false</hasActivationRequired>
+    <label>Offer Concierge Agent Access</label>
+</PermissionSet>

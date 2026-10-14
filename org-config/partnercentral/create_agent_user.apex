@@ -1,17 +1,19 @@
-// Partner Central sandbox (alias: partnercentral, org 00Dfj00000RYet7EAD)
-Profile agentProfile = [
-    SELECT Id
-    FROM Profile
-    WHERE Name = 'Einstein Agent User'
-    LIMIT 1
-];
-String username = 'offerconcierge.agent@00dfj00000ryet7ead.org.force.com';
+// Partner Central — Einstein agent user for Offer Concierge (must match v1 Agent Access / botUser).
+// Username from committed Bot metadata: OfferConcierge.bot-meta.xml botUser field.
+String username = 'offerconcierge@00dfj00000ryet71173413824.ext';
+
 List<User> existing = [SELECT Id FROM User WHERE Username = :username LIMIT 1];
 User agentUser;
 if (!existing.isEmpty()) {
     agentUser = existing[0];
     System.debug('Agent user already exists: ' + agentUser.Id);
 } else {
+    Profile agentProfile = [
+        SELECT Id
+        FROM Profile
+        WHERE Name = 'Einstein Agent User'
+        LIMIT 1
+    ];
     agentUser = new User(
         ProfileId = agentProfile.Id,
         Username = username,
@@ -28,8 +30,15 @@ if (!existing.isEmpty()) {
     insert agentUser;
     System.debug('Created agent user: ' + agentUser.Id);
 }
-PermissionSet ps = [SELECT Id FROM PermissionSet WHERE Name = 'Offer_Demo_Access' LIMIT 1];
-if ([SELECT COUNT() FROM PermissionSetAssignment WHERE AssigneeId = :agentUser.Id AND PermissionSetId = :ps.Id] == 0) {
-    insert new PermissionSetAssignment(AssigneeId = agentUser.Id, PermissionSetId = ps.Id);
-    System.debug('Assigned Offer_Demo_Access');
+
+assignPermSetIfMissing(agentUser.Id, 'AgentforceServiceAgentUser');
+assignPermSetIfMissing(agentUser.Id, 'Offer_Demo_Access');
+assignPermSetIfMissing(agentUser.Id, 'Agent_Broker_Access');
+
+static void assignPermSetIfMissing(Id userId, String permSetName) {
+    PermissionSet ps = [SELECT Id FROM PermissionSet WHERE Name = :permSetName LIMIT 1];
+    if ([SELECT COUNT() FROM PermissionSetAssignment WHERE AssigneeId = :userId AND PermissionSetId = :ps.Id] == 0) {
+        insert new PermissionSetAssignment(AssigneeId = userId, PermissionSetId = ps.Id);
+        System.debug('Assigned ' + permSetName);
+    }
 }

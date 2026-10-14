@@ -16,13 +16,22 @@
   var voiceToggle = document.getElementById("voiceToggle");
   var agentNameEl = document.getElementById("agentName");
   var agentStatusEl = document.getElementById("agentStatus");
+  var agentSubtitleEl = document.getElementById("agentSubtitle");
+  var quickRepliesEl = document.getElementById("quickReplies");
+  var flow = cfg.GIVEAWAY_FLOW || null;
 
   if (cfg.AGENT_NAME) agentNameEl.textContent = cfg.AGENT_NAME;
   if (cfg.AGENT_STATUS) agentStatusEl.textContent = cfg.AGENT_STATUS;
+  if (cfg.AGENT_SUBTITLE && agentSubtitleEl && !contactId) {
+    agentSubtitleEl.textContent = cfg.AGENT_SUBTITLE;
+    agentSubtitleEl.hidden = false;
+  }
 
   var sessionId = null;
   var sequenceId = 1;
   var busy = false;
+  /** @type {'goal'|'timeline'|'customer'|'details'|'free'|null} */
+  var giveawayPhase = contactId || !flow ? "free" : null;
 
   function scrollDown() {
     chatBody.scrollTop = chatBody.scrollHeight;
@@ -77,6 +86,159 @@
     busy = state;
     actionBtn.disabled = state;
     input.disabled = state;
+    if (quickRepliesEl) {
+      quickRepliesEl.querySelectorAll("button").forEach(function (btn) {
+        btn.disabled = state;
+      });
+    }
+  }
+
+  function setGiveawayPhase(phase) {
+    if (!flow || contactId) {
+      giveawayPhase = "free";
+      hideQuickReplies();
+      return;
+    }
+    giveawayPhase = phase;
+    if (phase === "free") {
+      hideQuickReplies();
+      return;
+    }
+    if (phase === "details") {
+      renderIntakeForm();
+      return;
+    }
+    renderQuickOptions(phase);
+  }
+
+  function hideQuickReplies() {
+    if (!quickRepliesEl) return;
+    quickRepliesEl.hidden = true;
+    quickRepliesEl.innerHTML = "";
+    composer.classList.remove("composer-dimmed");
+  }
+
+  function renderQuickOptions(phase) {
+    if (!quickRepliesEl || !flow) return;
+    var items = [];
+    if (phase === "goal") items = flow.goals || [];
+    else if (phase === "timeline") items = flow.timelines || [];
+    else if (phase === "customer") items = flow.customerStatus || [];
+
+    if (!items.length) {
+      hideQuickReplies();
+      return;
+    }
+
+    quickRepliesEl.hidden = false;
+    composer.classList.add("composer-dimmed");
+    quickRepliesEl.innerHTML =
+      '<div class="quick-opts">' +
+      items
+        .map(function (it) {
+          return (
+            '<button type="button" class="quick-opt" data-label="' +
+            escapeAttr(it.label) +
+            '">' +
+            escapeHtml(it.label) +
+            "</button>"
+          );
+        })
+        .join("") +
+      "</div>";
+
+    quickRepliesEl.querySelectorAll(".quick-opt").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        if (busy) return;
+        var label = btn.getAttribute("data-label");
+        onQuickPick(label, phase);
+      });
+    });
+  }
+
+  function renderIntakeForm() {
+    if (!quickRepliesEl) return;
+    quickRepliesEl.hidden = false;
+    composer.classList.add("composer-dimmed");
+    quickRepliesEl.innerHTML =
+      '<form class="intake-form" id="intakeForm">' +
+      '<div><label for="intakeName">Name</label>' +
+      '<input type="text" id="intakeName" autocomplete="name" maxlength="80">' +
+      '<div class="field-err" id="intakeNameErr"></div></div>' +
+      '<div><label for="intakeEmail">Email</label>' +
+      '<input type="email" id="intakeEmail" autocomplete="email" maxlength="120">' +
+      '<div class="field-err" id="intakeEmailErr"></div></div>' +
+      '<label class="intake-consent"><input type="checkbox" id="intakeConsent">' +
+      "<span>Yes, send me tailored offers by email. I can opt out anytime. (Optional — you can still enter the draw without this.)</span></label>" +
+      '<button type="submit" class="intake-submit">Enter the draw</button></form>';
+
+    var form = document.getElementById("intakeForm");
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      if (busy) return;
+      var nameEl = document.getElementById("intakeName");
+      var emailEl = document.getElementById("intakeEmail");
+      var consentEl = document.getElementById("intakeConsent");
+      var nameErr = document.getElementById("intakeNameErr");
+      var emailErr = document.getElementById("intakeEmailErr");
+      var ok = true;
+      var name = nameEl.value.trim();
+      var email = emailEl.value.trim();
+      nameErr.textContent = "";
+      emailErr.textContent = "";
+      nameEl.classList.remove("bad");
+      emailEl.classList.remove("bad");
+      if (!name) {
+        nameErr.textContent = "Enter your name";
+        nameEl.classList.add("bad");
+        ok = false;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+        emailErr.textContent = email ? "Check the email format" : "Enter your email";
+        emailEl.classList.add("bad");
+        ok = false;
+      }
+      if (!ok) return;
+
+      var consent = consentEl.checked ? "yes" : "no";
+      var msg =
+        "Enter draw: Name: " +
+        name +
+        ", Email: " +
+        email +
+        ", Marketing consent: " +
+        consent;
+      setGiveawayPhase("free");
+      addMessage(name, "out");
+      sendToAgent(msg, true);
+    });
+  }
+
+  function onQuickPick(label, phase) {
+    addMessage(label, "out");
+    if (phase === "goal") {
+      if (label === "Something else") {
+        hideQuickReplies();
+        composer.classList.remove("composer-dimmed");
+        input.focus();
+        giveawayPhase = "other";
+      } else {
+        setGiveawayPhase("timeline");
+      }
+    } else if (phase === "timeline") setGiveawayPhase("customer");
+    else if (phase === "customer") setGiveawayPhase("details");
+    sendToAgent(label, true);
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function escapeAttr(s) {
+    return escapeHtml(s).replace(/'/g, "&#39;");
   }
 
   async function postJson(path, body) {
@@ -105,8 +267,14 @@
       var data = await postJson("/session", { contactId: contactId });
       sessionId = data.sessionId;
       hideTyping();
-      // Kick off the conversation so the agent greets and lists the offers.
-      await sendToAgent("Hi! What offers do you have for me?", true);
+      if (contactId) {
+        await sendToAgent("Hi! What offers do you have for me?", true);
+      } else if (flow) {
+        setGiveawayPhase("goal");
+        await sendToAgent("Hi", true);
+      } else {
+        await sendToAgent("Hi", true);
+      }
     } catch (e) {
       hideTyping();
       showError("Couldn't start the chat: " + e.message);
@@ -157,6 +325,9 @@
     if (!text || busy) return;
     input.value = "";
     refreshActionButton();
+    if (giveawayPhase === "other") {
+      setGiveawayPhase("timeline");
+    }
     sendToAgent(text, false);
   }
 
