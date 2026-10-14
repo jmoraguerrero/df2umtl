@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ExternalClientApplication xmlns="http://soap.sforce.com/2006/04/metadata">
+    <contactEmail>jmoraguerrero@deloitte.ca</contactEmail>
+    <distributionState>Local</distributionState>
+    <isProtected>false</isProtected>
+    <label>DF2U_ECA</label>
+    <orgScopedExternalApp>00DAs00000yan7k:DF2U_ECA</orgScopedExternalApp>
+</ExternalClientApplication>

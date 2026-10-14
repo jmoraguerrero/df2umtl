@@ -53,10 +53,19 @@ start_agent agent_router:
     reasoning:
         instructions: ->
             | Route the customer's message to the right subagent.
-              If Contact_Id is empty AND intake_complete is 0, route to customer intake (collect name,
-              email, phone, confirm, then save as a Lead) — except when you are mid swag quiz question.
-              Once Contact_Id is set OR intake_complete is 1, route greetings and anything about offers,
-              plans, prices, discounts, or eligibility to offer discovery.
+
+              Session state (use these exact values for routing — do not guess):
+                Contact_Id: {!@variables.Contact_Id}
+                Lead_Id: {!@variables.Lead_Id}
+                intake_complete: {!@variables.intake_complete}
+
+              If Contact_Id is non-empty OR Lead_Id is non-empty OR intake_complete is 1, the customer is
+              already identified — NEVER route to customer intake.
+              If Contact_Id is empty AND Lead_Id is empty AND intake_complete is 0, route to customer intake
+              (collect name, email, phone, confirm, then save as a Lead) — except when you are mid swag quiz
+              question.
+              Once the customer is identified, route greetings and anything about offers, plans, prices,
+              discounts, or eligibility to offer discovery.
               Route anything about the quiz, winning swag/prizes/merch, or "what swag/prize could I win"
               to the swag quiz ONLY when Contact_Id is set OR intake_complete is 1 (Lead saved).
               IMPORTANT: If your most recent message to the customer was a swag quiz question (one that

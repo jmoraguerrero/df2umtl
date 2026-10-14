@@ -1,4 +1,4 @@
-// Writes the published agent Id into the broker config custom setting.
+// Default: df2umtl. For partnercentral use org-config/partnercentral/set_agent_id.apex
 AgentBrokerConfig__c cfg = AgentBrokerConfig__c.getOrgDefaults();
 if (cfg == null || cfg.Id == null) {
     cfg = new AgentBrokerConfig__c(SetupOwnerId = UserInfo.getOrganizationId());

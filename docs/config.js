@@ -7,7 +7,7 @@
 // If the Site URL ever changes (different sandbox / My Domain), update it here.
 window.OFFER_DEMO_CONFIG = {
   BROKER_BASE_URL:
-    "https://velocity-fun-8615--df2umtl.sandbox.my.salesforce-sites.com/offerdemo/services/apexrest/agentdemo",
+    "https://de1780924127103.my.salesforce-sites.com/offerdemo/services/apexrest/agentdemo",
 
   // Cosmetic: the name shown in the chat header.
   AGENT_NAME: "Offer Concierge",
