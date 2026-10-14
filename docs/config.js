@@ -11,7 +11,7 @@ window.OFFER_DEMO_CONFIG = {
   AGENT_SUBTITLE: "Prize draw entry",
   AGENT_STATUS: "online",
 
-  // Quick-reply labels must stay aligned with OfferConcierge.agent qualification steps.
+  // Goal chips only at session start; labels must match OfferConcierge.agent goal mapping.
   GIVEAWAY_FLOW: {
     goals: [
       { label: "Buy a home" },
@@ -19,15 +19,6 @@ window.OFFER_DEMO_CONFIG = {
       { label: "Pay down debt" },
       { label: "Plan for retirement" },
       { label: "Something else" },
-    ],
-    timelines: [
-      { label: "Within 3 months" },
-      { label: "In 3 to 12 months" },
-      { label: "Just exploring" },
-    ],
-    customerStatus: [
-      { label: "Yes, I bank with you" },
-      { label: "No, I'm new" },
     ],
   },
 };

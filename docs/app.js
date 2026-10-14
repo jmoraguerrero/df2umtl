@@ -30,8 +30,8 @@
   var sessionId = null;
   var sequenceId = 1;
   var busy = false;
-  /** @type {'goal'|'timeline'|'customer'|'details'|'free'|null} */
-  var giveawayPhase = contactId || !flow ? "free" : null;
+  /** @type {'goal'|'free'} */
+  var giveawayPhase = contactId || !flow ? "free" : "goal";
 
   function scrollDown() {
     chatBody.scrollTop = chatBody.scrollHeight;
@@ -93,24 +93,6 @@
     }
   }
 
-  function setGiveawayPhase(phase) {
-    if (!flow || contactId) {
-      giveawayPhase = "free";
-      hideQuickReplies();
-      return;
-    }
-    giveawayPhase = phase;
-    if (phase === "free") {
-      hideQuickReplies();
-      return;
-    }
-    if (phase === "details") {
-      renderIntakeForm();
-      return;
-    }
-    renderQuickOptions(phase);
-  }
-
   function hideQuickReplies() {
     if (!quickRepliesEl) return;
     quickRepliesEl.hidden = true;
@@ -118,20 +100,14 @@
     composer.classList.remove("composer-dimmed");
   }
 
-  function renderQuickOptions(phase) {
-    if (!quickRepliesEl || !flow) return;
-    var items = [];
-    if (phase === "goal") items = flow.goals || [];
-    else if (phase === "timeline") items = flow.timelines || [];
-    else if (phase === "customer") items = flow.customerStatus || [];
-
+  function showGoalChips() {
+    if (!quickRepliesEl || !flow || contactId || giveawayPhase !== "goal") return;
+    var items = flow.goals || [];
     if (!items.length) {
       hideQuickReplies();
       return;
     }
-
     quickRepliesEl.hidden = false;
-    composer.classList.add("composer-dimmed");
     quickRepliesEl.innerHTML =
       '<div class="quick-opts">' +
       items
@@ -151,82 +127,19 @@
       btn.addEventListener("click", function () {
         if (busy) return;
         var label = btn.getAttribute("data-label");
-        onQuickPick(label, phase);
+        onGoalChip(label);
       });
     });
   }
 
-  function renderIntakeForm() {
-    if (!quickRepliesEl) return;
-    quickRepliesEl.hidden = false;
-    composer.classList.add("composer-dimmed");
-    quickRepliesEl.innerHTML =
-      '<form class="intake-form" id="intakeForm">' +
-      '<div><label for="intakeName">Name</label>' +
-      '<input type="text" id="intakeName" autocomplete="name" maxlength="80">' +
-      '<div class="field-err" id="intakeNameErr"></div></div>' +
-      '<div><label for="intakeEmail">Email</label>' +
-      '<input type="email" id="intakeEmail" autocomplete="email" maxlength="120">' +
-      '<div class="field-err" id="intakeEmailErr"></div></div>' +
-      '<label class="intake-consent"><input type="checkbox" id="intakeConsent">' +
-      "<span>Yes, send me tailored offers by email. I can opt out anytime. (Optional — you can still enter the draw without this.)</span></label>" +
-      '<button type="submit" class="intake-submit">Enter the draw</button></form>';
-
-    var form = document.getElementById("intakeForm");
-    form.addEventListener("submit", function (e) {
-      e.preventDefault();
-      if (busy) return;
-      var nameEl = document.getElementById("intakeName");
-      var emailEl = document.getElementById("intakeEmail");
-      var consentEl = document.getElementById("intakeConsent");
-      var nameErr = document.getElementById("intakeNameErr");
-      var emailErr = document.getElementById("intakeEmailErr");
-      var ok = true;
-      var name = nameEl.value.trim();
-      var email = emailEl.value.trim();
-      nameErr.textContent = "";
-      emailErr.textContent = "";
-      nameEl.classList.remove("bad");
-      emailEl.classList.remove("bad");
-      if (!name) {
-        nameErr.textContent = "Enter your name";
-        nameEl.classList.add("bad");
-        ok = false;
-      }
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
-        emailErr.textContent = email ? "Check the email format" : "Enter your email";
-        emailEl.classList.add("bad");
-        ok = false;
-      }
-      if (!ok) return;
-
-      var consent = consentEl.checked ? "yes" : "no";
-      var msg =
-        "Enter draw: Name: " +
-        name +
-        ", Email: " +
-        email +
-        ", Marketing consent: " +
-        consent;
-      setGiveawayPhase("free");
-      addMessage(name, "out");
-      sendToAgent(msg, true);
-    });
+  function endGoalChipPhase() {
+    giveawayPhase = "free";
+    hideQuickReplies();
   }
 
-  function onQuickPick(label, phase) {
+  function onGoalChip(label) {
     addMessage(label, "out");
-    if (phase === "goal") {
-      if (label === "Something else") {
-        hideQuickReplies();
-        composer.classList.remove("composer-dimmed");
-        input.focus();
-        giveawayPhase = "other";
-      } else {
-        setGiveawayPhase("timeline");
-      }
-    } else if (phase === "timeline") setGiveawayPhase("customer");
-    else if (phase === "customer") setGiveawayPhase("details");
+    endGoalChipPhase();
     sendToAgent(label, true);
   }
 
@@ -270,7 +183,7 @@
       if (contactId) {
         await sendToAgent("Hi! What offers do you have for me?", true);
       } else if (flow) {
-        setGiveawayPhase("goal");
+        showGoalChips();
         await sendToAgent("Hi", true);
       } else {
         await sendToAgent("Hi", true);
@@ -325,8 +238,8 @@
     if (!text || busy) return;
     input.value = "";
     refreshActionButton();
-    if (giveawayPhase === "other") {
-      setGiveawayPhase("timeline");
+    if (giveawayPhase === "goal") {
+      endGoalChipPhase();
     }
     sendToAgent(text, false);
   }
