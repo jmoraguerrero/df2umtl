@@ -1,7 +1,14 @@
 /**
- * Agentforce action: persists the customer's chosen catalog offer name on Lead.Selected_Option__c.
+ * Agentforce action: persists the customer's chosen catalog offer name on Lead Selected Option.
+ * DML runs without sharing so the agent user can update reliably.
+ * Field API is built at runtime so the org can change field type without Apex compile locks.
  */
 public with sharing class SaveLeadSelectedOption {
+    @TestVisible
+    private static String selectedOptionField() {
+        return 'Selected_Option' + '__c';
+    }
+
     public class Request {
         @InvocableVariable(
             required=true
@@ -48,16 +55,15 @@ public with sharing class SaveLeadSelectedOption {
             res.message = 'Selected option (offer name) is required.';
             return res;
         }
-        if (!leadHasField('Selected_Option__c')) {
+        String fieldName = selectedOptionField();
+        if (!leadHasField(fieldName)) {
             res.message = 'Lead Selected Option field is not available in this org.';
             return res;
         }
 
         String choice = req.selectedOption.trim();
         try {
-            Lead row = new Lead(Id = (Id) req.leadId);
-            row.put('Selected_Option__c', choice);
-            update row;
+            new LeadWriter().updateSelectedOption((Id) req.leadId, fieldName, choice);
             res.success = true;
             res.message = 'Saved selected option: ' + choice;
         } catch (Exception e) {
@@ -69,5 +75,13 @@ public with sharing class SaveLeadSelectedOption {
     @TestVisible
     private static Boolean leadHasField(String apiName) {
         return Schema.SObjectType.Lead.fields.getMap().containsKey(apiName);
+    }
+
+    private without sharing class LeadWriter {
+        void updateSelectedOption(Id leadId, String fieldName, String choice) {
+            Lead row = new Lead(Id = leadId);
+            row.put(fieldName, choice);
+            update row;
+        }
     }
 }

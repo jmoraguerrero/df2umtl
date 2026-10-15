@@ -3,7 +3,8 @@ private class SaveLeadSelectedOptionTest {
 
     @IsTest
     static void updatesSelectedOptionWhenFieldExists() {
-        if (!SaveLeadSelectedOption.leadHasField('Selected_Option__c')) {
+        String fieldName = SaveLeadSelectedOption.selectedOptionField();
+        if (!SaveLeadSelectedOption.leadHasField(fieldName)) {
             return;
         }
 
@@ -24,12 +25,11 @@ private class SaveLeadSelectedOptionTest {
         )[0];
 
         System.assertEquals(true, res.success, res.message);
-        Lead updated = [
-            SELECT Selected_Option__c
-            FROM Lead
-            WHERE Id = :l.Id
-        ];
-        System.assertEquals('Business Credit Card', updated.Selected_Option__c);
+        Id leadId = l.Id;
+        Lead updated = Database.query(
+            'SELECT Id, ' + fieldName + ' FROM Lead WHERE Id = :leadId LIMIT 1'
+        );
+        System.assertEquals('Business Credit Card', (String) updated.get(fieldName));
     }
 
     @IsTest

@@ -347,12 +347,6 @@ body {
   padding: 8px 14px;
 }
 
-.composer-input .emoji,
-.composer-input .clip {
-  color: var(--wa-muted);
-  font-size: 18px;
-}
-
 .composer-input input {
   flex: 1;
   border: none;
