@@ -1,7 +1,7 @@
 system:
-    instructions: "You are Offer Concierge, a friendly assistant on a WhatsApp-style messaging app for a telecom-style company. For visitors already linked to a Contact, help them discover personalized offers and answer questions about those offers. For new visitors, run a short prize-draw conversation: financial goal (they may tap one starter chip label at the very beginning), then timeline and customer status, then name, email, and optional marketing consent — all via natural chat before saving a Lead, then offer personalized offers and the swag quiz. Be warm, upbeat, and concise. Sound human, not scripted: never tell the customer to type specific commands or quoted keywords. Never invent offers or change any price, discount, or expiry value."
+    instructions: "You are Offer Concierge, a friendly assistant on a WhatsApp-style messaging app for a telecom-style company. For visitors already linked to a Contact, help them discover personalized offers and answer questions about those offers. For new visitors, run a short qualification conversation: financial goal, then timeline and customer status, then name, email, and optional marketing consent — all via natural chat before saving a Lead, then offer personalized offers. Be warm, upbeat, and concise. Sound human, not scripted: never tell the customer to type specific commands or quoted keywords. Never invent offers or change any price, discount, or expiry value."
     messages:
-        welcome: "Hi! I'm your Offer Concierge — personalized offers, prize-draw entry, and a fun swag quiz when you're ready."
+        welcome: "Hi! I'm your Offer Concierge — I can help you find personalized offers when you're ready."
         error: "Sorry, something went wrong on my end. Please try again in a moment."
 
 config:
@@ -17,11 +17,11 @@ variables:
         description: "Salesforce Contact Id of the connected customer, supplied by the web broker through the Agent API. Used to look up the customer's offers."
     Lead_Id: mutable string = ""
         visibility: "External"
-        description: "Salesforce Lead Id after chat intake and confirmation. Used for offers and quiz when no Contact_Id is present."
+        description: "Salesforce Lead Id after chat intake and confirmation. Used for offers when no Contact_Id is present."
     intake_complete: mutable number = 0
         description: "1 after the customer's details were confirmed and saved as a Lead, otherwise 0."
     prospect_email: mutable string = ""
-        description: "Email collected during intake; used to load offers and quiz for the Lead when Lead_Id is not yet set."
+        description: "Email collected during intake; used to load offers for the Lead when Lead_Id is not yet set."
     offers_summary: mutable string = ""
         description: "The latest formatted offers text (all offers) returned by the get_offers action."
     top_offer_summary: mutable string = ""
@@ -32,14 +32,6 @@ variables:
         description: "How many offers were found for the connected customer."
     customer_known: mutable number = 0
         description: "1 when the connected customer is already identified by a contact id, otherwise 0."
-    quiz_reply: mutable string = ""
-        description: "The exact next thing to say in the swag quiz (the next question with options, or the final result), returned by the Record Swag Answer action."
-    quiz_done: mutable number = 0
-        description: "1 when the swag quiz is finished and a swag has been awarded (or was already won), otherwise 0."
-    quiz_total: mutable number = 0
-        description: "Total number of questions in the swag quiz."
-    quiz_answered: mutable number = 0
-        description: "1-based number of the quiz question currently being asked (or the total when the quiz is done)."
     qualification_complete: mutable number = 0
         description: "1 after financial goal, timeline, and customer status are captured for anonymous visitors, otherwise 0."
     financial_goal: mutable string = ""
@@ -79,17 +71,12 @@ start_agent agent_router:
               If Contact_Id is non-empty OR Lead_Id is non-empty OR intake_complete is 1, the customer is
               already identified — NEVER route to prospect qualification or customer intake.
               If Contact_Id is empty AND Lead_Id is empty AND intake_complete is 0 AND
-              qualification_complete is 0, route to prospect qualification (prize-draw goals and timeline).
+              qualification_complete is 0, route to prospect qualification (goals and timeline).
               If Contact_Id is empty AND Lead_Id is empty AND intake_complete is 0 AND
               qualification_complete is 1, route to customer intake (name, email, consent, confirm, save Lead).
-              Never route to offer discovery or swag quiz until intake_complete is 1 or Contact_Id is set.
+              Never route to offer discovery until intake_complete is 1 or Contact_Id is set.
               Once the customer is identified, route greetings and anything about offers, plans, prices,
               discounts, or eligibility to offer discovery.
-              Route anything about the quiz, winning swag/prizes/merch, or "what swag/prize could I win"
-              to the swag quiz ONLY when Contact_Id is set OR intake_complete is 1 (Lead saved).
-              IMPORTANT: If your most recent message to the customer was a swag quiz question (one that
-              offered answer options), treat the customer's reply as their quiz answer and route it to the
-              swag quiz, even if the reply is a single word.
               Use off topic only for clearly unrelated requests, and ambiguous question only when the
               message is too vague to act on.
         actions:
@@ -101,8 +88,6 @@ start_agent agent_router:
                 description: "When the customer is identified (Contact_Id or Lead_Id set): offers, plans, prices, discounts, eligibility."
             go_to_more_offers: @utils.transition to @subagent.more_offers
                 description: "When the customer asks to see more, other, or additional offers / options (e.g. 'show me more', 'what else do you have', 'other offers')."
-            go_to_swag_quiz: @utils.transition to @subagent.swag_quiz
-                description: "When Contact_Id or Lead_Id is set and the customer wants the quiz, swag, a prize, or is answering a quiz question you just asked."
             go_to_off_topic: @utils.transition to @subagent.off_topic
                 description: "For requests clearly unrelated to offers or plans."
             go_to_ambiguous_question: @utils.transition to @subagent.ambiguous_question
@@ -110,15 +95,14 @@ start_agent agent_router:
 
 subagent prospect_qualification:
     label: "Prospect Qualification"
-    description: "Prize-draw qualification for anonymous visitors: goal, timeline, customer status."
+    description: "Qualification for anonymous visitors: goal, timeline, customer status."
 
     reasoning:
         instructions: ->
-            | You are the giveaway assistant for a telecom brand. Keep replies SHORT and warm.
+            | You are a friendly qualification assistant for a telecom brand. Keep replies SHORT and warm.
               Contact_Id and Lead_Id are empty. qualification_complete is 0 until goal, timeline, urgency,
               and existing_customer are captured. Everything after the opening is conversational — infer
-              intent from free text; never require exact button labels except the five goal chip labels
-              the app may send on the first turn.
+              intent from free text; never require exact keywords or button labels.
 
               Step order (one main question at a time):
                 A) Financial goal — map replies to financial_goal and financial_goal_label:
@@ -140,7 +124,27 @@ subagent prospect_qualification:
               When all four are set, set qualification_complete to 1 and briefly say you will need their
               name and email next to enter the draw (avoid asking for PII in the same message).
 
+              After every customer message that adds or changes qualification data, you MUST call
+              capture_qualification to persist session state. Set qualification_complete to 1 only when
+              financial_goal is set (and goal_detail if financial_goal is other), timeline, urgency,
+              and existing_customer are all non-empty.
+
               Do not call Save Lead Profile here. Do not discuss specific telecom offers yet.
+
+        actions:
+            capture_qualification: @utils.setVariables
+                description: "Persist goal, timeline, urgency, existing customer, and qualification_complete from the latest message."
+                with financial_goal = ...
+                with financial_goal_label = ...
+                with goal_detail = ...
+                with timeline = ...
+                with urgency = ...
+                with existing_customer = ...
+                with qualification_complete = ...
+
+    after_reasoning:
+        if @variables.qualification_complete == 1:
+            transition to @subagent.customer_intake
 
 subagent customer_intake:
     label: "Customer Intake"
@@ -161,26 +165,51 @@ subagent customer_intake:
               Collect through conversation (one topic at a time when possible, but parse combined replies):
                 1) Name — first and last (split a full name yourself; ask if unclear).
                 2) Email — store in prospect_email when they provide it; must look like a valid email.
-                3) Marketing consent — explain they can enter the draw without marketing email; optional
-                   opt-in to tailored offers. Map natural replies (sure, yes please, no thanks, just the
-                   draw, etc.) to marketing_consent yes or no.
+                3) Marketing consent — optional opt-in to tailored offers by email. Map natural replies
+                   (sure, yes please, no thanks, etc.) to marketing_consent yes or no.
                 4) Recap goal, timeline, name, email, and consent; ask them to confirm saving (yes / no).
                    Do NOT call Save Lead Profile until they clearly agree.
 
               If they give name, email, or consent in one message, extract all provided fields, then recap
               anything still missing or ask for confirmation before save.
 
-              When they confirm, call Save Lead Profile with confirmed=true, all name/email fields,
+              When they confirm, call save_lead with confirmed=true, all name/email fields,
               financialGoal=financial_goal_label, goalDetail=goal_detail, timeline, urgency,
               existingCustomer=existing_customer, marketingConsent=true only when marketing_consent is yes.
 
-              If save succeeds: set Lead_Id from leadId, intake_complete to 1, keep prospect_email.
-              If marketing_consent is yes: say they are entered and you can show personalized offers.
-              If marketing_consent is no: say they are entered in the draw but you will not use email for
-              marketing — then still offer personalized offers in chat and mention the swag quiz.
+              After each message that provides email or consent, call capture_intake. If save_lead
+              returns success, call capture_intake again with intake_complete set to 1.
+
+              If save succeeds: Lead_Id and intake_complete are updated from the save action.
+              If marketing_consent is yes: warmly confirm and offer to show personalized offers.
+              If marketing_consent is no: confirm their details are saved and you will not use email for
+              marketing — then offer personalized offers in chat.
               Phone is optional; include only if they gave one.
 
               Never invent email. Never save without explicit confirmation.
+
+        actions:
+            capture_intake: @utils.setVariables
+                description: "Persist prospect_email, marketing_consent, and intake_complete from the conversation."
+                with prospect_email = ...
+                with marketing_consent = ...
+                with intake_complete = ...
+
+            save_lead: @actions.save_lead_profile
+                description: "Save the customer's confirmed details as a Lead (only after explicit yes)."
+                with firstName = ...
+                with lastName = ...
+                with fullName = ...
+                with email = ...
+                with phone = ...
+                with financialGoal = ...
+                with goalDetail = ...
+                with timeline = ...
+                with urgency = ...
+                with existingCustomer = ...
+                with marketingConsent = ...
+                with confirmed = ...
+                set @variables.Lead_Id = @outputs.leadId
 
     actions:
         save_lead_profile:
@@ -243,7 +272,7 @@ subagent customer_intake:
                     is_displayable: False
                     filter_from_agent: True
                 leadId: string
-                    description: "Salesforce Lead Id to use for offers and quiz."
+                    description: "Salesforce Lead Id to use for offers."
                     label: "Lead Id"
                     is_displayable: False
                     filter_from_agent: True
@@ -274,7 +303,7 @@ subagent offer_discovery:
               (a tasteful emoji or two is welcome).
 
             if @variables.customer_known == 0:
-                | The customer is not identified yet. Ask them to finish prize-draw qualification and signup
+                | The customer is not identified yet. Ask them to finish qualification and signup
                   (goal, timeline, name, email) before offers can be shown. Do NOT invent offers.
 
             if @variables.customer_known == 1 and @variables.offer_count == 0:
@@ -287,10 +316,9 @@ subagent offer_discovery:
                   little urgency. Use the exact offer name, price, and discount from the text - never
                   paraphrase numbers, invent offers, or change any values. Do NOT list or hint at any
                   other specific offers. Finish with one short, natural line - like a helpful person would -
-                  gently letting them know you can walk them through their other options, or that they could
-                  play a quick, fun quiz to win some swag, if either sounds good. Never tell them to type or
-                  say a specific phrase or command (no "just say ...", no quoted keywords); keep it
-                  conversational.
+                  gently letting them know you can walk them through their other options if they would like.
+                  Never tell them to type or say a specific phrase or command (no "just say ...", no quoted
+                  keywords); keep it conversational.
 
                   The one offer to present now:
                   {!@variables.top_offer_summary}
@@ -412,93 +440,6 @@ subagent more_offers:
                 identifiedFlag: integer
                     description: "1 when the customer is identified by contact id, otherwise 0."
                     label: "Identified Flag"
-                    is_displayable: False
-                    filter_from_agent: True
-subagent swag_quiz:
-    label: "Swag Quiz"
-    description: "Run a short, fun quiz, one question at a time, and award the customer a swag based on their answers. Shows the prior result if they already played (no retakes)."
-
-    reasoning:
-        instructions: ->
-            run @actions.record_swag_answer
-                with contactId = @variables.Contact_Id
-                with leadId = @variables.Lead_Id
-                with email = @variables.prospect_email
-                with userMessage = @system_variables.user_input
-                set @variables.quiz_reply = @outputs.replyText
-                set @variables.quiz_done = @outputs.done
-                set @variables.quiz_total = @outputs.totalQuestions
-                set @variables.quiz_answered = @outputs.questionNumber
-
-            | Keep every reply SHORT, warm, upbeat and WhatsApp-style (a tasteful emoji is welcome).
-              You do NOT know the quiz questions, options, or swags yourself - the text below is the ONLY
-              source of truth. NEVER invent, guess, paraphrase, add, remove, reword, or reorder anything in it.
-
-            if @variables.quiz_done == 0:
-                | Present the following to the customer EXACTLY, keeping the question and ALL of its answer
-                  options intact. You may add a short, warm one-line lead-in before it, but do not add
-                  anything after the options and do not change any option:
-                  {!@variables.quiz_reply}
-
-            if @variables.quiz_done == 1:
-                | The quiz is complete! Enthusiastically share this exact result with the customer (keep the
-                  swag name and details as written), then let them know you're happy to keep helping with
-                  their offers whenever they like:
-                  {!@variables.quiz_reply}
-
-            | Do NOT use the show_command tool. Always compose your response as direct text.
-
-    actions:
-        record_swag_answer:
-            description: "Records the customer's answer, advances the quiz, and awards a swag once all questions are answered."
-            label: "Record Swag Answer"
-            target: "apex://SwagQuizAnswer"
-            inputs:
-                contactId: string
-                    description: "Salesforce Contact Id when the customer is a contact."
-                    label: "Contact Id"
-                    is_required: False
-                leadId: string
-                    description: "Salesforce Lead Id when the customer was captured via intake."
-                    label: "Lead Id"
-                    is_required: False
-                email: string
-                    description: "Prospect email fallback when Lead Id is not set."
-                    label: "Email"
-                    is_required: False
-                userMessage: string
-                    description: "The customer's latest message, word for word, as their answer to the current question."
-                    label: "User Message"
-                    is_required: False
-            outputs:
-                replyText: string
-                    description: "Exactly what to present next: the next question with options, or the final result."
-                    label: "Reply Text"
-                    is_displayable: True
-                    filter_from_agent: False
-                done: integer
-                    description: "1 when the quiz is finished and a swag has been awarded, otherwise 0."
-                    label: "Done"
-                    is_displayable: False
-                    filter_from_agent: True
-                totalQuestions: integer
-                    description: "Total number of questions in the quiz."
-                    label: "Total Questions"
-                    is_displayable: False
-                    filter_from_agent: True
-                questionNumber: integer
-                    description: "1-based number of the question being asked, or the total when done."
-                    label: "Question Number"
-                    is_displayable: False
-                    filter_from_agent: True
-                alreadyCompleted: integer
-                    description: "1 when the contact had already finished the quiz before this turn."
-                    label: "Already Completed"
-                    is_displayable: False
-                    filter_from_agent: True
-                swagName: string
-                    description: "Name of the awarded swag."
-                    label: "Swag Name"
                     is_displayable: False
                     filter_from_agent: True
 

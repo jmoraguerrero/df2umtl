@@ -17,8 +17,6 @@
   var agentNameEl = document.getElementById("agentName");
   var agentStatusEl = document.getElementById("agentStatus");
   var agentSubtitleEl = document.getElementById("agentSubtitle");
-  var quickRepliesEl = document.getElementById("quickReplies");
-  var flow = cfg.GIVEAWAY_FLOW || null;
 
   if (cfg.AGENT_NAME) agentNameEl.textContent = cfg.AGENT_NAME;
   if (cfg.AGENT_STATUS) agentStatusEl.textContent = cfg.AGENT_STATUS;
@@ -30,8 +28,6 @@
   var sessionId = null;
   var sequenceId = 1;
   var busy = false;
-  /** @type {'goal'|'free'} */
-  var giveawayPhase = contactId || !flow ? "free" : "goal";
 
   function scrollDown() {
     chatBody.scrollTop = chatBody.scrollHeight;
@@ -86,72 +82,6 @@
     busy = state;
     actionBtn.disabled = state;
     input.disabled = state;
-    if (quickRepliesEl) {
-      quickRepliesEl.querySelectorAll("button").forEach(function (btn) {
-        btn.disabled = state;
-      });
-    }
-  }
-
-  function hideQuickReplies() {
-    if (!quickRepliesEl) return;
-    quickRepliesEl.hidden = true;
-    quickRepliesEl.innerHTML = "";
-    composer.classList.remove("composer-dimmed");
-  }
-
-  function showGoalChips() {
-    if (!quickRepliesEl || !flow || contactId || giveawayPhase !== "goal") return;
-    var items = flow.goals || [];
-    if (!items.length) {
-      hideQuickReplies();
-      return;
-    }
-    quickRepliesEl.hidden = false;
-    quickRepliesEl.innerHTML =
-      '<div class="quick-opts">' +
-      items
-        .map(function (it) {
-          return (
-            '<button type="button" class="quick-opt" data-label="' +
-            escapeAttr(it.label) +
-            '">' +
-            escapeHtml(it.label) +
-            "</button>"
-          );
-        })
-        .join("") +
-      "</div>";
-
-    quickRepliesEl.querySelectorAll(".quick-opt").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        if (busy) return;
-        var label = btn.getAttribute("data-label");
-        onGoalChip(label);
-      });
-    });
-  }
-
-  function endGoalChipPhase() {
-    giveawayPhase = "free";
-    hideQuickReplies();
-  }
-
-  function onGoalChip(label) {
-    addMessage(label, "out");
-    endGoalChipPhase();
-    sendToAgent(label, true);
-  }
-
-  function escapeHtml(s) {
-    return String(s)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/"/g, "&quot;");
-  }
-
-  function escapeAttr(s) {
-    return escapeHtml(s).replace(/'/g, "&#39;");
   }
 
   async function postJson(path, body) {
@@ -182,9 +112,6 @@
       hideTyping();
       if (contactId) {
         await sendToAgent("Hi! What offers do you have for me?", true);
-      } else if (flow) {
-        showGoalChips();
-        await sendToAgent("Hi", true);
       } else {
         await sendToAgent("Hi", true);
       }
@@ -202,7 +129,6 @@
       showError("Broker URL is not configured (see config.js).");
       return;
     }
-    // No contactId: start anonymous session; agent runs Lead intake in chat.
     startSession();
   }
 
@@ -238,9 +164,6 @@
     if (!text || busy) return;
     input.value = "";
     refreshActionButton();
-    if (giveawayPhase === "goal") {
-      endGoalChipPhase();
-    }
     sendToAgent(text, false);
   }
 
@@ -294,7 +217,6 @@
       }
       input.value = transcript;
       refreshActionButton();
-      // When the engine marks a final result, send it automatically.
       if (e.results[e.results.length - 1].isFinal) {
         stopRecognition();
         var text = input.value.trim();
@@ -326,7 +248,6 @@
   function startRecognition() {
     if (!recognition || busy) return;
     try {
-      // Cancel any ongoing voice output so the mic doesn't hear the agent.
       if (window.speechSynthesis) window.speechSynthesis.cancel();
       input.value = "";
       refreshActionButton();
