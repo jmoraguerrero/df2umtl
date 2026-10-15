@@ -1,6 +1,6 @@
 /**
- * Agentforce action: returns offers for a Contact (Contact__c) or Lead (Lead__c).
- * Supply contactId OR leadId — contact wins when both are set.
+ * Agentforce action: returns the active Offer__c product catalog (demo: two credit cards).
+ * contactId / leadId only set identifiedFlag for session gating — offers are not personalized.
  */
 public with sharing class GetOffersForCustomer {
     @TestVisible
@@ -69,15 +69,11 @@ public with sharing class GetOffersForCustomer {
             lId = resolveLeadIdByEmail(req.email);
         }
 
-        if (cId == null && lId == null) {
-            return res;
+        if (cId != null || lId != null) {
+            res.identifiedFlag = 1;
         }
 
-        res.identifiedFlag = 1;
-        List<Offer__c> records = queryLinkedOffers(cId, lId);
-        if (records.isEmpty()) {
-            records = queryActiveCatalogOffers();
-        }
+        List<Offer__c> records = queryActiveCatalogOffers();
 
         List<String> allLines = new List<String>();
         List<String> moreLines = new List<String>();
@@ -95,7 +91,7 @@ public with sharing class GetOffersForCustomer {
         res.offerCount = records.size();
         res.moreOffersSummary = moreLines.isEmpty() ? '' : String.join(moreLines, '\n');
         res.offersSummary = records.isEmpty()
-            ? 'There are no active offers available for this customer right now.'
+            ? 'There are no active offers in the catalog right now.'
             : String.join(allLines, '\n');
         if (res.topOfferSummary == null) {
             res.topOfferSummary = '';
@@ -113,33 +109,7 @@ public with sharing class GetOffersForCustomer {
         return offerFieldMap().containsKey(apiName);
     }
 
-    @TestVisible
-    private static List<Offer__c> queryLinkedOffers(Id contactId, Id leadId) {
-        String selectClause = offerSelectClause();
-        if (contactId != null && offerHasField('Contact__c')) {
-            String soql =
-                'SELECT ' +
-                selectClause +
-                ' FROM Offer__c WHERE Contact__c = :contactId';
-            soql += activeAndExpirationFilters();
-            soql += ' ORDER BY Name ASC LIMIT :maxRows';
-            Integer maxRows = MAX_OFFERS;
-            return Database.query(soql);
-        }
-        if (leadId != null && offerHasField('Lead__c')) {
-            String soql =
-                'SELECT ' +
-                selectClause +
-                ' FROM Offer__c WHERE Lead__c = :leadId';
-            soql += activeAndExpirationFilters();
-            soql += ' ORDER BY Name ASC LIMIT :maxRows';
-            Integer maxRows = MAX_OFFERS;
-            return Database.query(soql);
-        }
-        return new List<Offer__c>();
-    }
-
-    /** Active offers with no Contact/Lead — banking demo product catalog. */
+    /** Active catalog rows (Contact__c and Lead__c null when those fields exist). */
     @TestVisible
     private static List<Offer__c> queryActiveCatalogOffers() {
         String selectClause = offerSelectClause();

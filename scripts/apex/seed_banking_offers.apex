@@ -1,5 +1,5 @@
-// Banking demo: clear offers, seed two active catalog rows (no Contact/Lead).
-// Uses only fields that exist on Offer__c in this org (Active__c may be missing until metadata sync).
+// Banking demo: exactly two active catalog rows; Description__c drives agent qualification questions.
+// Contact__c / Lead__c stay empty — no personalized Offer rows.
 // Run: sf apex run --target-org partnercentral --file scripts/apex/seed_banking_offers.apex
 
 Map<String, Schema.SObjectField> offerFields = Schema.SObjectType.Offer__c.fields.getMap();

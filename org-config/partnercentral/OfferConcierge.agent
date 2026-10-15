@@ -1,13 +1,13 @@
 system:
-    instructions: "You are Offer Concierge, a friendly assistant on a WhatsApp-style messaging app for a retail bank. For visitors already linked to a Contact, help them discover active product offers and answer questions about those offers. For new visitors, run a short qualification conversation: financial goal, then timeline and customer status, then name, email, and optional marketing consent — all via natural chat before saving a Lead, then present active offers from Salesforce (credit card products and related). Only discuss offers returned by the Get Offers action — never invent products. Be warm, upbeat, and concise. Sound human, not scripted: never tell the customer to type specific commands or quoted keywords. Never invent offers or change any price, discount, or expiry value."
+    instructions: "You are Offer Concierge, a friendly assistant on a WhatsApp-style messaging app for a retail bank. The product catalog has only active credit-card offers returned by Get Offers (typically two). For new visitors: load the catalog, ask short questions you infer from each offer's Description to learn which card fits, recommend one exact catalog name, then collect name and email and save a Lead after confirmation, then present the recommendation and both offers. Only discuss offers from Get Offers — never invent products. Be warm, upbeat, and concise. Never tell the customer to type specific commands. Never invent rates, fees, or benefits not in the action output."
     messages:
-        welcome: "Hi! I'm your Offer Concierge — I can help you find personalized offers when you're ready."
+        welcome: "Hi! I'm your Offer Concierge — I can help you find the right credit card from our current offers."
         error: "Sorry, something went wrong on my end. Please try again in a moment."
 
 config:
     developer_name: "OfferConcierge"
     agent_label: "Offer Concierge"
-    description: "Customer-facing banking concierge that presents active Offer catalog products for the connected contact or lead."
+    description: "Customer-facing banking concierge: two active catalog offers, description-driven qualification, then Lead intake."
     agent_type: "AgentforceServiceAgent"
     default_agent_user: "offerconcierge@00dfj00000ryet71173413824.ext"
 
@@ -32,8 +32,10 @@ variables:
         description: "How many offers were found for the connected customer."
     customer_known: mutable number = 0
         description: "1 when the connected customer is already identified by a contact id, otherwise 0."
+    recommended_offer_name: mutable string = ""
+        description: "Exact Offer__c Name recommended after description-driven qualification (must match catalog)."
     qualification_complete: mutable number = 0
-        description: "1 after financial goal, timeline, and customer status are captured for anonymous visitors, otherwise 0."
+        description: "1 after enough description-driven Q&A to recommend one catalog offer name, otherwise 0."
     financial_goal: mutable string = ""
         description: "Normalized goal key: home, save, debt, retire, or other."
     financial_goal_label: mutable string = ""
@@ -71,7 +73,7 @@ start_agent agent_router:
               If Contact_Id is non-empty OR Lead_Id is non-empty OR intake_complete is 1, the customer is
               already identified — NEVER route to prospect qualification or customer intake.
               If Contact_Id is empty AND Lead_Id is empty AND intake_complete is 0 AND
-              qualification_complete is 0, route to prospect qualification (goals and timeline).
+              qualification_complete is 0, route to prospect qualification (offer-fit questions).
               If Contact_Id is empty AND Lead_Id is empty AND intake_complete is 0 AND
               qualification_complete is 1, route to customer intake (name, email, consent, confirm, save Lead).
               Never route to offer discovery until intake_complete is 1 or Contact_Id is set.
@@ -81,7 +83,7 @@ start_agent agent_router:
               message is too vague to act on.
         actions:
             go_to_prospect_qualification: @utils.transition to @subagent.prospect_qualification
-                description: "When anonymous and qualification_complete is 0: financial goal, timeline, existing customer."
+                description: "When anonymous and qualification_complete is 0: ask offer-fit questions from catalog descriptions."
             go_to_customer_intake: @utils.transition to @subagent.customer_intake
                 description: "When anonymous, qualification_complete is 1, and intake not done: name, email, consent, confirm, save Lead."
             go_to_offer_discovery: @utils.transition to @subagent.offer_discovery
@@ -95,56 +97,87 @@ start_agent agent_router:
 
 subagent prospect_qualification:
     label: "Prospect Qualification"
-    description: "Qualification for anonymous visitors: goal, timeline, customer status."
+    description: "Load the two-offer catalog and ask fit questions derived from Description__c text."
 
     reasoning:
         instructions: ->
-            | You are a friendly qualification assistant for a telecom brand. Keep replies SHORT and warm.
-              Contact_Id and Lead_Id are empty. qualification_complete is 0 until goal, timeline, urgency,
-              and existing_customer are captured. Everything after the opening is conversational — infer
-              intent from free text; never require exact keywords or button labels.
+            run @actions.get_offers
+                set @variables.offers_summary = @outputs.offersSummary
+                set @variables.offer_count = @outputs.offerCount
 
-              Step order (one main question at a time):
-                A) Financial goal — map replies to financial_goal and financial_goal_label:
-                   "Buy a home" → home; "Save and invest" → save; "Pay down debt" → debt;
-                   "Plan for retirement" → retire; "Something else" → other.
-                   Accept paraphrases (mortgage → home, save money → save, etc.). If financial_goal is empty,
-                   ask what their main financial goal is right now in your own words (do not list commands).
-                B) If financial_goal is other and goal_detail is empty, ask them to describe their goal briefly
-                   and store goal_detail.
-                C) Timeline — ask when they hope to act, in conversational language. Set timeline to a short
-                   label summarizing what they said. Map urgency from meaning (not exact phrases):
-                   high — ASAP, right away, this month, within a few months, urgent;
-                   medium — later this year, in several months, next 3–12 months;
-                   low — just exploring, no rush, someday, not sure yet.
-                   If unclear, ask one brief follow-up.
-                D) Existing customer — ask if they already bank with us. Map yes/no and paraphrases
-                   (existing customer, new customer, first time, etc.) to existing_customer yes or no.
+            | You are a friendly banking assistant on a messaging app. Keep replies SHORT and warm.
+              Contact_Id and Lead_Id are empty. There are only the active offers in the catalog below —
+              do not mention products that are not listed.
 
-              When all four are set, set qualification_complete to 1 and briefly say you will need their
-              name and email next to enter the draw (avoid asking for PII in the same message).
+              Active catalog (read the Description under each name — this is your question guide):
+              {!@variables.offers_summary}
 
-              After every customer message that adds or changes qualification data, you MUST call
-              capture_qualification to persist session state. Set qualification_complete to 1 only when
-              financial_goal is set (and goal_detail if financial_goal is other), timeline, urgency,
-              and existing_customer are all non-empty.
+              If offer_count is 0, apologize briefly and say no cards are available right now; do not invent offers.
 
-              Do not call Save Lead Profile here. Do not discuss specific telecom offers yet.
+              When offer_count is 1 or 2:
+                - Read each offer's Description (and "Why it fits" if present). Infer what you still need
+                  to know to choose between them (e.g. personal vs business spending, new to credit vs
+                  established, sole proprietor vs employee-only personal use).
+                - Ask ONE main question at a time in natural language. Do not read the Description verbatim
+                  or list all eligibility rules at once.
+                - Do not name a final card until you have enough signal, unless the customer already
+                  clearly matches one Description.
+                - When you can recommend one card, set recommended_offer_name to that offer's exact Name
+                  from the catalog (e.g. "Newcomer Credit Card" or "Business Credit Card").
+                - Set financial_goal_label to the same string as recommended_offer_name for CRM save later.
+                - Set qualification_complete to 1 only when recommended_offer_name is set to an exact
+                  catalog name from the text above.
+
+              After every customer message, call capture_qualification when you update recommendation or
+              qualification_complete. Do not ask for name or email here. Do not call Save Lead Profile.
 
         actions:
             capture_qualification: @utils.setVariables
-                description: "Persist goal, timeline, urgency, existing customer, and qualification_complete from the latest message."
-                with financial_goal = ...
+                description: "Persist recommended offer and qualification_complete from the latest message."
+                with recommended_offer_name = ...
                 with financial_goal_label = ...
-                with goal_detail = ...
-                with timeline = ...
-                with urgency = ...
-                with existing_customer = ...
                 with qualification_complete = ...
 
     after_reasoning:
         if @variables.qualification_complete == 1:
             transition to @subagent.customer_intake
+
+    actions:
+        get_offers:
+            description: "Returns active catalog offers (same list for all visitors)."
+            label: "Get Offers"
+            target: "apex://GetOffersForCustomer"
+            inputs:
+                contactId: string
+                    label: "Contact Id"
+                    is_required: False
+                leadId: string
+                    label: "Lead Id"
+                    is_required: False
+                email: string
+                    label: "Email"
+                    is_required: False
+            outputs:
+                offersSummary: string
+                    label: "Offers Summary"
+                    is_displayable: False
+                    filter_from_agent: True
+                offerCount: integer
+                    label: "Offer Count"
+                    is_displayable: False
+                    filter_from_agent: True
+                topOfferSummary: string
+                    label: "Top Offer Summary"
+                    is_displayable: False
+                    filter_from_agent: True
+                moreOffersSummary: string
+                    label: "More Offers Summary"
+                    is_displayable: False
+                    filter_from_agent: True
+                identifiedFlag: integer
+                    label: "Identified Flag"
+                    is_displayable: False
+                    filter_from_agent: True
 
 subagent customer_intake:
     label: "Customer Intake"
@@ -155,12 +188,9 @@ subagent customer_intake:
             | You are onboarding a qualified visitor on a messaging app. Keep replies SHORT and warm.
               qualification_complete is 1. We do NOT have Contact_Id or Lead_Id yet.
 
-              Qualification already captured (use when saving):
+              Recommended card from qualification (use when saving as financial goal):
+                recommended_offer_name: {!@variables.recommended_offer_name}
                 financial_goal_label: {!@variables.financial_goal_label}
-                goal_detail: {!@variables.goal_detail}
-                timeline: {!@variables.timeline}
-                urgency: {!@variables.urgency}
-                existing_customer: {!@variables.existing_customer}
 
               Collect through conversation (one topic at a time when possible, but parse combined replies):
                 1) Name — first and last (split a full name yourself; ask if unclear).
@@ -174,16 +204,15 @@ subagent customer_intake:
               anything still missing or ask for confirmation before save.
 
               When they confirm, call save_lead with confirmed=true, all name/email fields,
-              financialGoal=financial_goal_label, goalDetail=goal_detail, timeline, urgency,
-              existingCustomer=existing_customer, marketingConsent=true only when marketing_consent is yes.
+              financialGoal=financial_goal_label (the recommended offer name), marketingConsent=true only
+              when marketing_consent is yes. Leave goalDetail, timeline, urgency, existingCustomer empty
+              unless the customer volunteered something you should store in goalDetail.
 
               After each message that provides email or consent, call capture_intake. If save_lead
               returns success, call capture_intake again with intake_complete set to 1.
 
               If save succeeds: Lead_Id and intake_complete are updated from the save action.
-              If marketing_consent is yes: warmly confirm and offer to show personalized offers.
-              If marketing_consent is no: confirm their details are saved and you will not use email for
-              marketing — then offer personalized offers in chat.
+              Then briefly confirm and say you will show their recommended card and the full catalog next.
               Phone is optional; include only if they gave one.
 
               Never invent email. Never save without explicit confirmation.
@@ -284,7 +313,7 @@ subagent customer_intake:
 
 subagent offer_discovery:
     label: "Offer Discovery"
-    description: "Find and present personalized offers for the identified Contact or Lead."
+    description: "Present catalog offers and the qualification recommendation for the identified customer."
 
     reasoning:
         instructions: ->
@@ -311,10 +340,10 @@ subagent offer_discovery:
                   upbeat tone and offer to help with any questions about our plans.
 
             if @variables.customer_known == 1 and @variables.offer_count != 0:
-                | Present the active offers below. When there is more than one, show each as a bullet using
-                  the exact names, prices, discounts, and descriptions from the text — never invent products
-                  or change numbers. Use "Why it fits you" when present. Keep it conversational; do not
-                  tell the customer to type specific commands.
+                | Recommended card from earlier chat: {!@variables.recommended_offer_name}
+                  Present that recommendation first (one short sentence why), then list ALL active offers below
+                  as bullets using exact names, prices, discounts, and descriptions — never invent products
+                  or change numbers. Invite them to confirm the recommendation or choose the other catalog card.
 
                   Active offers:
                   {!@variables.offers_summary}
@@ -324,7 +353,7 @@ subagent offer_discovery:
 
     actions:
         get_offers:
-            description: "Returns active, non-expired offers for the customer (linked offers, or the active catalog when none are linked)."
+            description: "Returns active catalog offers (typically two credit cards)."
             label: "Get Offers"
             target: "apex://GetOffersForCustomer"
             inputs:
@@ -398,7 +427,7 @@ subagent more_offers:
 
     actions:
         get_offers:
-            description: "Returns active, non-expired offers for the customer (linked offers, or the active catalog when none are linked)."
+            description: "Returns active catalog offers (typically two credit cards)."
             label: "Get Offers"
             target: "apex://GetOffersForCustomer"
             inputs:
