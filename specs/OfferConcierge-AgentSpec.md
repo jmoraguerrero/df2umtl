@@ -38,11 +38,11 @@ Customer-facing WhatsApp-style chat for a **banking** demo. The agent:
 
 | Concept | Field | Values |
 |--------|-------|--------|
-| User’s final choice | `Selected_Option__c` (confirm API name) | Offer **`Name`** |
-| Prompt/agent suggestion | Recommended Option (add if missing) | Same |
-| Qualification notes | Existing Lead fields from intake | e.g. goal = recommended offer name |
+| User’s final choice | **`Selected_Option__c`** (org field) | Exact catalog **`Name`** via `SaveLeadSelectedOption` |
+| Recommendation (session only) | `recommended_offer_name` variable | Not stored on Lead (no Recommended field) |
+| Qualification context | Lead **`Description`** on intake | Recommended card + optional notes via `SaveLeadProfile` |
 
-Conversation transcript on Lead: optional later phase.
+Conversation transcript on Lead: later phase.
 
 ## Variables (session)
 
@@ -87,9 +87,10 @@ Remove / avoid: `more_offers` (only two products), per-customer Offer lookups, t
 | Action | Backing | Purpose |
 |--------|---------|---------|
 | `get_offers` | `apex://GetOffersForCustomer` | **Active catalog only** (works with or without Lead/Contact) |
-| `save_lead_profile` | `apex://SaveLeadProfile` | After confirm |
+| `save_lead_profile` | `apex://SaveLeadProfile` | After confirm (Description notes) |
+| `save_lead_selected_option` | `apex://SaveLeadSelectedOption` | When customer confirms or changes card |
 
-Future (optional): prompt-based analyze, Lead transcript, `update_lead_offer_choice`.
+Future (optional): Lead transcript, prompt-based analyze.
 
 ## Gating
 

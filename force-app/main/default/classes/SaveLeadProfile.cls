@@ -24,16 +24,16 @@ public with sharing class SaveLeadProfile {
             description='Must be true to persist. Customer must have explicitly agreed to save their details.'
         )
         public Boolean confirmed;
-        @InvocableVariable(label='Financial Goal' description='Human-readable goal label from qualification.')
-        public String financialGoal;
-        @InvocableVariable(label='Goal Detail' description='Free-text goal when the customer chose Something else.')
-        public String goalDetail;
-        @InvocableVariable(label='Timeline' description='Timeline label from qualification.')
-        public String timeline;
-        @InvocableVariable(label='Urgency' description='high, medium, or low — maps to Lead Rating when valid.')
-        public String urgency;
-        @InvocableVariable(label='Existing Customer' description='yes or no from qualification.')
-        public String existingCustomer;
+        @InvocableVariable(
+            label='Recommended Offer'
+            description='Exact catalog offer name recommended during qualification (stored on Lead Description).'
+        )
+        public String recommendedOffer;
+        @InvocableVariable(
+            label='Qualification Notes'
+            description='Optional free-text notes from the fit conversation.'
+        )
+        public String qualificationNotes;
         @InvocableVariable(
             label='Marketing Consent'
             description='True when the customer opted in to tailored offers by email.'
@@ -146,21 +146,12 @@ public with sharing class SaveLeadProfile {
     @TestVisible
     private static String buildDescription(Request req) {
         List<String> lines = new List<String>();
-        lines.add('Chat qualification (Offer Concierge)');
-        if (String.isNotBlank(req.financialGoal)) {
-            lines.add('Financial goal: ' + req.financialGoal.trim());
+        lines.add('Offer Concierge chat');
+        if (String.isNotBlank(req.recommendedOffer)) {
+            lines.add('Recommended card: ' + req.recommendedOffer.trim());
         }
-        if (String.isNotBlank(req.goalDetail)) {
-            lines.add('Goal detail: ' + req.goalDetail.trim());
-        }
-        if (String.isNotBlank(req.timeline)) {
-            lines.add('Timeline: ' + req.timeline.trim());
-        }
-        if (String.isNotBlank(req.existingCustomer)) {
-            String cust = req.existingCustomer.trim().equalsIgnoreCase('yes')
-                ? 'Existing customer'
-                : 'New to us';
-            lines.add('Customer status: ' + cust);
+        if (String.isNotBlank(req.qualificationNotes)) {
+            lines.add('Notes: ' + req.qualificationNotes.trim());
         }
         if (req.marketingConsent != null) {
             lines.add(
@@ -168,24 +159,6 @@ public with sharing class SaveLeadProfile {
             );
         }
         return String.join(lines, '\n');
-    }
-
-    @TestVisible
-    private static String urgencyToRating(String urgency) {
-        if (String.isBlank(urgency)) {
-            return null;
-        }
-        String u = urgency.trim().toLowerCase();
-        if (u == 'high') {
-            return 'Hot';
-        }
-        if (u == 'medium') {
-            return 'Warm';
-        }
-        if (u == 'low') {
-            return 'Cold';
-        }
-        return null;
     }
 
     @TestVisible
@@ -246,11 +219,6 @@ public with sharing class SaveLeadProfile {
             String qualificationNotes = buildDescription(req);
             if (String.isNotBlank(qualificationNotes)) {
                 row.Description = qualificationNotes;
-            }
-
-            String rating = urgencyToRating(req.urgency);
-            if (isActivePicklistValue(Lead.Rating, rating)) {
-                row.Rating = rating;
             }
 
             if (req.marketingConsent != null) {

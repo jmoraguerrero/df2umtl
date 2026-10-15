@@ -29,7 +29,7 @@ private class SaveLeadProfileTest {
         System.assertEquals(true, res.success, res.message);
         System.assertNotEquals(null, res.leadId);
         Lead l = [
-            SELECT FirstName, LastName, Email, Phone, Company, Description, HasOptedOutOfEmail, Rating, Status
+            SELECT FirstName, LastName, Email, Phone, Company, Description, HasOptedOutOfEmail, Status
             FROM Lead
             WHERE Id = :res.leadId
         ];
@@ -39,16 +39,14 @@ private class SaveLeadProfileTest {
     }
 
     @IsTest
-    static void savesQualificationOnStandardFields() {
+    static void savesRecommendedOfferOnDescription() {
         SaveLeadProfile.Request req = new SaveLeadProfile.Request();
         req.firstName = 'Sam';
         req.lastName = 'Ng';
         req.email = 'sam.ng@example.com';
         req.confirmed = true;
-        req.financialGoal = 'Buy a home';
-        req.timeline = 'Within 3 months';
-        req.urgency = 'high';
-        req.existingCustomer = 'no';
+        req.recommendedOffer = 'Newcomer Credit Card';
+        req.qualificationNotes = 'First card, personal spending only.';
         req.marketingConsent = true;
 
         Test.startTest();
@@ -57,27 +55,23 @@ private class SaveLeadProfileTest {
 
         System.assertEquals(true, res.success, res.message);
         Lead l = [
-            SELECT Description, HasOptedOutOfEmail, Rating, Status
+            SELECT Description, HasOptedOutOfEmail, Status
             FROM Lead
             WHERE Id = :res.leadId
         ];
-        System.assert(l.Description != null && l.Description.contains('Buy a home'));
+        System.assert(l.Description != null && l.Description.contains('Newcomer Credit Card'));
+        System.assert(l.Description.contains('First card'));
         System.assertEquals(false, l.HasOptedOutOfEmail);
-        if (SaveLeadProfile.isActivePicklistValue(Lead.Rating, 'Hot')) {
-            System.assertEquals('Hot', l.Rating);
-        }
     }
 
     @IsTest
     static void buildDescriptionIncludesConsentNo() {
         SaveLeadProfile.Request req = new SaveLeadProfile.Request();
-        req.financialGoal = 'Save and invest';
-        req.timeline = 'Just exploring';
-        req.existingCustomer = 'yes';
+        req.recommendedOffer = 'Business Credit Card';
         req.marketingConsent = false;
         String notes = SaveLeadProfile.buildDescription(req);
+        System.assert(notes.contains('Business Credit Card'));
         System.assert(notes.contains('Not given'));
-        System.assert(notes.contains('Existing customer'));
     }
 
     @IsTest
