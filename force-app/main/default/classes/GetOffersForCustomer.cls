@@ -74,29 +74,9 @@ public with sharing class GetOffersForCustomer {
         }
 
         res.identifiedFlag = 1;
-        List<Offer__c> records;
-        if (cId != null) {
-            records = [
-                SELECT Name, Description__c, Category__c, Price__c, Discount__c, ExpirationDate__c,
-                       Reason__c, RelevanceScore__c
-                FROM Offer__c
-                WHERE Contact__c = :cId
-                  AND Active__c = true
-                  AND (ExpirationDate__c = null OR ExpirationDate__c >= :Date.today())
-                ORDER BY RelevanceScore__c DESC NULLS LAST, Discount__c DESC NULLS LAST, Price__c ASC
-                LIMIT :MAX_OFFERS
-            ];
-        } else {
-            records = [
-                SELECT Name, Description__c, Category__c, Price__c, Discount__c, ExpirationDate__c,
-                       Reason__c, RelevanceScore__c
-                FROM Offer__c
-                WHERE Lead__c = :lId
-                  AND Active__c = true
-                  AND (ExpirationDate__c = null OR ExpirationDate__c >= :Date.today())
-                ORDER BY RelevanceScore__c DESC NULLS LAST, Discount__c DESC NULLS LAST, Price__c ASC
-                LIMIT :MAX_OFFERS
-            ];
+        List<Offer__c> records = queryLinkedOffers(cId, lId);
+        if (records.isEmpty()) {
+            records = queryActiveCatalogOffers();
         }
 
         List<String> allLines = new List<String>();
@@ -121,6 +101,99 @@ public with sharing class GetOffersForCustomer {
             res.topOfferSummary = '';
         }
         return res;
+    }
+
+    @TestVisible
+    private static Map<String, Schema.SObjectField> offerFieldMap() {
+        return Schema.SObjectType.Offer__c.fields.getMap();
+    }
+
+    @TestVisible
+    private static Boolean offerHasField(String apiName) {
+        return offerFieldMap().containsKey(apiName);
+    }
+
+    @TestVisible
+    private static List<Offer__c> queryLinkedOffers(Id contactId, Id leadId) {
+        String selectClause = offerSelectClause();
+        if (contactId != null && offerHasField('Contact__c')) {
+            String soql =
+                'SELECT ' +
+                selectClause +
+                ' FROM Offer__c WHERE Contact__c = :contactId';
+            soql += activeAndExpirationFilters();
+            soql += ' ORDER BY Name ASC LIMIT :maxRows';
+            Integer maxRows = MAX_OFFERS;
+            return Database.query(soql);
+        }
+        if (leadId != null && offerHasField('Lead__c')) {
+            String soql =
+                'SELECT ' +
+                selectClause +
+                ' FROM Offer__c WHERE Lead__c = :leadId';
+            soql += activeAndExpirationFilters();
+            soql += ' ORDER BY Name ASC LIMIT :maxRows';
+            Integer maxRows = MAX_OFFERS;
+            return Database.query(soql);
+        }
+        return new List<Offer__c>();
+    }
+
+    /** Active offers with no Contact/Lead — banking demo product catalog. */
+    @TestVisible
+    private static List<Offer__c> queryActiveCatalogOffers() {
+        String selectClause = offerSelectClause();
+        List<String> filters = new List<String>();
+        if (offerHasField('Contact__c')) {
+            filters.add('Contact__c = null');
+        }
+        if (offerHasField('Lead__c')) {
+            filters.add('Lead__c = null');
+        }
+        String soql = 'SELECT ' + selectClause + ' FROM Offer__c';
+        if (!filters.isEmpty()) {
+            soql += ' WHERE ' + String.join(filters, ' AND ');
+            soql += activeAndExpirationFilters().replace(' AND ', ' AND ');
+        } else if (offerHasField('Active__c')) {
+            soql += ' WHERE Active__c = true';
+        }
+        if (offerHasField('RelevanceScore__c')) {
+            soql += ' ORDER BY RelevanceScore__c DESC NULLS LAST, Name ASC';
+        } else {
+            soql += ' ORDER BY Name ASC';
+        }
+        soql += ' LIMIT :maxRows';
+        Integer maxRows = MAX_OFFERS;
+        return Database.query(soql);
+    }
+
+    private static String offerSelectClause() {
+        List<String> parts = new List<String>{ 'Name' };
+        for (String fieldName : new List<String>{
+            'Description__c',
+            'Category__c',
+            'Price__c',
+            'Discount__c',
+            'ExpirationDate__c',
+            'Reason__c',
+            'RelevanceScore__c'
+        }) {
+            if (offerHasField(fieldName)) {
+                parts.add(fieldName);
+            }
+        }
+        return String.join(parts, ', ');
+    }
+
+    private static String activeAndExpirationFilters() {
+        String clause = '';
+        if (offerHasField('Active__c')) {
+            clause += ' AND Active__c = true';
+        }
+        if (offerHasField('ExpirationDate__c')) {
+            clause += ' AND (ExpirationDate__c = null OR ExpirationDate__c >= TODAY)';
+        }
+        return clause;
     }
 
     private static Id validId(String raw) {
